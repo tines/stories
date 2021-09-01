@@ -76,7 +76,7 @@
               ]
             }
           ],
-          "text": "Hello from you're friendly security team! 👨‍💻 \n\nWe're checking in on an alert we received:"
+          "text": "Hello from your friendly security team! 👨‍💻 \n\nWe're checking in on an alert we received:"
         },
         "headers": {
           "Authorization": "Bearer {{.CREDENTIAL.slack }}"
