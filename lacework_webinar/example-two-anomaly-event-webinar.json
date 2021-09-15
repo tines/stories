@@ -1,0 +1,569 @@
+{
+  "schema_version": 3,
+  "name": "Example Two - Anomaly Event",
+  "description": null,
+  "guid": "56c05f622e96d2ad0afad34d83830f4a",
+  "exported_at": "2021-09-15T11:35:42Z",
+  "agents": [
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "Receive Lacework Events",
+      "disabled": false,
+      "guid": "1e166f8a0466a9b49036320d8fe98fd3",
+      "options": {
+        "secret": "c08061be9f6f43a3a3560735bdd1d59f"
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Deduplicate Events for Instances",
+      "disabled": false,
+      "guid": "e9ecc5b65602ddf73a6ad30d883a8843",
+      "options": {
+        "mode": "deduplicate",
+        "path": "{{ .receive_lacework_events.body.event_title }}{{.receive_lacework_events.body.event_description }}",
+        "period": "86400"
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if OK",
+      "disabled": false,
+      "guid": "5157e02bd7a054f7a01efd781c17de0d",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "knowngood",
+            "path": "{{.post_slack_alert.prompt.status }}"
+          }
+        ]
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if Stop Instance",
+      "disabled": false,
+      "guid": "db22cce55c67400304d013ce37926dd1",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "quarantine",
+            "path": "{{.post_slack_alert.prompt.status }}"
+          }
+        ]
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Stop Amazon EC2 Instance",
+      "disabled": false,
+      "guid": "05b39b4cd3ad73641faceaadd46bfbf0",
+      "options": {
+        "url": "https://ec2.us-east-2.amazonaws.com/?Action=StopInstances&&Version=2016-11-15",
+        "method": "post",
+        "headers": {
+          "Authorization": "{{ .CREDENTIAL.aws_ec2 }}"
+        },
+        "payload": {
+          "InstanceId.1": "{{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Machine.first.INSTANCE_ID }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "EC2 Stop Message to a Slack Channel",
+      "disabled": false,
+      "guid": "2c300efd71867bd9bb49b9f5616da65a",
+      "options": {
+        "url": "https://slack.com/api/chat.postMessage",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "channel": "engineering-team",
+          "text": "EC2 Instance has been Stopped",
+          "blocks": [
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "An EC2 instance has been stopped based on Lacework alert {{.get_event_by_id_in_lacework.body.data.first.EVENT_ID }}"
+              }
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "*Instance State:*\nStoppping\n*Instance Type:*\n{{.describe_amazon_ec2_instances.body.DescribeInstancesResponse.reservationSet.item.instancesSet.item.instanceType }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "{{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Machine.first.INSTANCE_ID }}"
+                }
+              ]
+            }
+          ]
+        },
+        "headers": {
+          "Authorization": "Bearer {{ .CREDENTIAL.slack }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if Anomaly",
+      "disabled": false,
+      "guid": "cc11575e99ff91333b3335e8307a7fdf",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "Lacework Agent",
+            "path": "{{.receive_lacework_events.body.event_source }}"
+          }
+        ]
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Post Message to a Slack Channel",
+      "disabled": false,
+      "guid": "6b7f09683f4e76452117c39dbc74ae5a",
+      "options": {
+        "url": "https://slack.com/api/chat.postMessage",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "channel": "engineering-team",
+          "text": "Thanks for responding!"
+        },
+        "headers": {
+          "Authorization": "Bearer {{ .CREDENTIAL.slack }}"
+        }
+      },
+      "schedule": [],
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Post Slack Alert",
+      "disabled": false,
+      "guid": "e4e1a3ebd5d7c0ee7eb5e4d767ad6f77",
+      "options": {
+        "url": "https://slack.com/api/chat.postMessage",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "channel": "engineering-team",
+          "attachments": [
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*New Lacework Alert*\n*Alert Title:* {{.receive_lacework_events.body.event_title }} {{.get_event_by_id_in_lacework.body.data.first.EVENT_ID }}\n*Description:* {{.receive_lacework_events.body.event_description }}\n*Event Type:* {{.get_event_by_id_in_lacework.body.data.first.EVENT_TYPE }}\n*Event Source:* {{.receive_lacework_events.body.event_source }}\nClick *<{{.receive_lacework_events.body.event_link }}|here>* to open the event in Lacework"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Machine:*\n{{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Machine.first.HOSTNAME }} on external IP {{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Machine.first.EXTERNAL_IP }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Instance State:*\n{{.describe_amazon_ec2_instances.body.DescribeInstancesResponse.reservationSet.item.instancesSet.item.instanceState.name }}\n*Instance Type:*\n{{.describe_amazon_ec2_instances.body.DescribeInstancesResponse.reservationSet.item.instancesSet.item.instanceType }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Instance Launch Time:*\n{{.describe_amazon_ec2_instances.body.DescribeInstancesResponse.reservationSet.item.instancesSet.item.launchTime }}\n*Tags*\n{% for tag in .describe_amazon_ec2_instances.body.DescribeInstancesResponse.reservationSet.item.instancesSet.item.tagSet.item %}{{tag.key}}: {{tag.value}}\n{% endfor %}\n*Instance ID*\n{{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Machine.first.INSTANCE_ID }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Process CMDLINE:*\n{% for process in .get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Process %}{{process.CMDLINE}}\n{% endfor %}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "This is Known Activity"
+                      },
+                      "style": "primary",
+                      "url": "{% prompt knowngood %}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "Stop Instance"
+                      },
+                      "style": "danger",
+                      "url": "{% prompt quarantine %}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "headers": {
+          "Authorization": "Bearer {{ .CREDENTIAL.slack }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Event by ID in Lacework",
+      "disabled": false,
+      "guid": "496bebcbe0e988a55171d5f1c617914b",
+      "options": {
+        "url": "https://{{ .RESOURCE.lacework_domain }}/api/v1/external/events/GetEventDetails?EVENT_ID={{.receive_lacework_events.body.event_id }}",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "{{.CREDENTIAL.lacework }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Describe Amazon EC2 Instances",
+      "disabled": false,
+      "guid": "0ec0a1b36f8b2bdbd3466da2233dc5bc",
+      "options": {
+        "url": "https://ec2.us-east-2.amazonaws.com?Action=DescribeInstances&InstanceId.1={{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Machine.first.INSTANCE_ID }}&Version=2016-11-15",
+        "method": "get",
+        "headers": {
+          "Authorization": "{{ .CREDENTIAL.aws_ec2 }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Create Issue in Jira",
+      "disabled": false,
+      "guid": "88da5afdad917ae4988534db7fd3ebf7",
+      "options": {
+        "url": "https://{{ .RESOURCE.jira_domain }}/rest/api/2/issue",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "fields": {
+            "project": {
+              "key": "DEMO"
+            },
+            "issuetype": {
+              "name": "Task"
+            },
+            "priority": {
+              "name": "Medium"
+            },
+            "description": "*New Lacework Alert*\n*Alert Title:* {{.receive_lacework_events.body.event_title }}\n*Description:* {{.receive_lacework_events.body.event_description }}\n*Click [here|{{.receive_lacework_events.body.event_link }}]* to open the event in Lacework\n\n||Name||Details||\n|Event Type|{{.get_event_by_id_in_lacework.body.data.first.EVENT_TYPE }}|\n|Event Source|{{.receive_lacework_events.body.event_source }}|\n|External IP|{{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Machine.first.EXTERNAL_IP }}\n|Machine|{{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Machine.first.HOSTNAME }}|\n|Instance ID|{{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Machine.first.INSTANCE_ID }}|\n|Instance State|{{.describe_amazon_ec2_instances.body.DescribeInstancesResponse.reservationSet.item.instancesSet.item.instanceState.name }}|\n|Instance Type:|{{.describe_amazon_ec2_instances.body.DescribeInstancesResponse.reservationSet.item.instancesSet.item.instanceType }}|\n|Instance Launch Time:|{{.describe_amazon_ec2_instances.body.DescribeInstancesResponse.reservationSet.item.instancesSet.item.launchTime }}|\n|Tags|{% for tag in .describe_amazon_ec2_instances.body.DescribeInstancesResponse.reservationSet.item.instancesSet.item.tagSet.item %}{{tag.key}}: {{tag.value}}\n{% endfor %}|\n|Process CMDLINE|{% for process in .get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Process %}{{process.CMDLINE}}\n{% endfor %}|\n",
+            "summary": "Lacework Alert - {{.receive_lacework_events.body.event_title }} ({{ \"now\" | date: \"%Y-%m-%d\" }})"
+          }
+        },
+        "basic_auth": [
+          "{{ .RESOURCE.jira_username }}",
+          "{{ .CREDENTIAL.jira }}"
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Close Ticket",
+      "disabled": false,
+      "guid": "86bdffc762c7547e0414c3697a42790c",
+      "options": {
+        "url": "https://tinesio.atlassian.net/rest/api/2/issue/{{.create_issue_in_jira.body.key}}/transitions",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "transition": {
+            "id": "31"
+          }
+        },
+        "log_error_on_status": [],
+        "basic_auth": [
+          "{{.RESOURCE.jira_username }}",
+          "{{ .CREDENTIAL.jira }}"
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Update Jira Ticket",
+      "disabled": false,
+      "guid": "bfecd5d9975c114f7b2659176ea9db95",
+      "options": {
+        "url": "https://tinesio.atlassian.net/rest/api/2/issue/{{.create_issue_in_jira.body.key}}/comment/",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "body": "This is legit - User Has confirmed on Slack that they recognize this Activity. This ticket will be closed automatically"
+        },
+        "basic_auth": [
+          "{{ .RESOURCE.jira_username }}",
+          "{{ .CREDENTIAL.jira }}"
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Update Jira Ticket",
+      "disabled": false,
+      "guid": "83a6c26e53767846ae32a4de1a2d7e66",
+      "options": {
+        "url": "https://{{.RESOURCE.jira_domain }}/rest/api/2/issue/{{.create_issue_in_jira }}/comment/",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "body": "An EC2 instance, {{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Machine.first.INSTANCE_ID }}, has been stopped based on Lacework alert {{.get_event_by_id_in_lacework.body.data.first.EVENT_ID }}"
+        },
+        "basic_auth": [
+          "{{ .RESOURCE.jira_username }}",
+          "{{ .CREDENTIAL.jira }}"
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Create an Incident in PagerDuty",
+      "disabled": false,
+      "guid": "d4aac0f7fcc268d744ecd2de72947955",
+      "options": {
+        "url": "https://api.pagerduty.com/incidents",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "incident": {
+            "type": "incident",
+            "title": "An EC2 instance has been stopped",
+            "service": {
+              "id": "{{.RESOURCE.pagerduty_service_id }}",
+              "type": "service_reference"
+            },
+            "urgency": "high",
+            "body": {
+              "type": "serious incident",
+              "details": "An EC2 instance, {{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Machine.first.INSTANCE_ID }}, has been stopped based on Lacework alert {{.get_event_by_id_in_lacework.body.data.first.EVENT_ID }}"
+            }
+          }
+        },
+        "headers": {
+          "Authorization": "Token token={{ .CREDENTIAL.pagerduty }}",
+          "From": "thomas@tines.io"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Request to api.opsgenie.com",
+      "disabled": false,
+      "guid": "d5485947fb78b9ab4e65b50fa94d9d34",
+      "options": {
+        "url": "https://api.opsgenie.com/v2/alerts",
+        "method": "post",
+        "content_type": "json",
+        "payload": {
+          "message": "An example alert message",
+          "alias": "Life is too short for no alias",
+          "description": "Every alert needs a description",
+          "responders": [
+            {
+              "id": "4513b7ea-3b91-438f-b7e4-e3e54af9147c",
+              "type": "team"
+            },
+            {
+              "name": "NOC",
+              "type": "team"
+            },
+            {
+              "id": "bb4d9938-c3c2-455d-aaab-727aa701c0d8",
+              "type": "user"
+            },
+            {
+              "username": "trinity@opsgenie.com",
+              "type": "user"
+            },
+            {
+              "id": "aee8a0de-c80f-4515-a232-501c0bc9d715",
+              "type": "escalation"
+            },
+            {
+              "name": "Nightwatch Escalation",
+              "type": "escalation"
+            },
+            {
+              "id": "80564037-1984-4f38-b98e-8a1f662df552",
+              "type": "schedule"
+            },
+            {
+              "name": "First Responders Schedule",
+              "type": "schedule"
+            }
+          ],
+          "visibleTo": [
+            {
+              "id": "4513b7ea-3b91-438f-b7e4-e3e54af9147c",
+              "type": "team"
+            },
+            {
+              "name": "rocket_team",
+              "type": "team"
+            },
+            {
+              "id": "bb4d9938-c3c2-455d-aaab-727aa701c0d8",
+              "type": "user"
+            },
+            {
+              "username": "trinity@opsgenie.com",
+              "type": "user"
+            }
+          ],
+          "actions": [
+            "Restart",
+            "AnExampleAction"
+          ],
+          "tags": [
+            "OverwriteQuietHours",
+            "Critical"
+          ],
+          "details": {
+            "key1": "value1",
+            "key2": "value2"
+          },
+          "entity": "An example entity",
+          "priority": "P1"
+        },
+        "headers": {
+          "Authorization": "GenieKey eb243592-faa2-4ba2-a551q-1afdf565c889"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    }
+  ],
+  "diagram_notes": [
+    {
+      "content": "https://customerdemo.lacework.net/ui/images/lacework-logo-color.svg\n\n\n# Anomaly Events\ne.g. \n- New User Logged into Device\n- AssumedRole using Aws for the first time\n- External connection made to new host\n- User logged in from New or Unusual Location",
+      "position": [
+        15.0,
+        105.0
+      ],
+      "guid": "4038405d1fd884df58b8d8f70f82beca"
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 6
+    },
+    {
+      "source": 1,
+      "receiver": 9
+    },
+    {
+      "source": 2,
+      "receiver": 7
+    },
+    {
+      "source": 3,
+      "receiver": 4
+    },
+    {
+      "source": 4,
+      "receiver": 5
+    },
+    {
+      "source": 5,
+      "receiver": 14
+    },
+    {
+      "source": 6,
+      "receiver": 1
+    },
+    {
+      "source": 7,
+      "receiver": 13
+    },
+    {
+      "source": 8,
+      "receiver": 2
+    },
+    {
+      "source": 8,
+      "receiver": 3
+    },
+    {
+      "source": 9,
+      "receiver": 10
+    },
+    {
+      "source": 10,
+      "receiver": 11
+    },
+    {
+      "source": 11,
+      "receiver": 8
+    },
+    {
+      "source": 13,
+      "receiver": 12
+    },
+    {
+      "source": 14,
+      "receiver": 15
+    }
+  ],
+  "diagram_layout": "{\"1e166f8a0466a9b49036320d8fe98fd3\":[375.0,105.0],\"e9ecc5b65602ddf73a6ad30d883a8843\":[375.0,285.0],\"5157e02bd7a054f7a01efd781c17de0d\":[375.0,795.0],\"db22cce55c67400304d013ce37926dd1\":[615.0,795.0],\"05b39b4cd3ad73641faceaadd46bfbf0\":[615.0,900.0],\"2c300efd71867bd9bb49b9f5616da65a\":[615.0,1005.0],\"cc11575e99ff91333b3335e8307a7fdf\":[375.0,210.0],\"6b7f09683f4e76452117c39dbc74ae5a\":[375.0,900.0],\"e4e1a3ebd5d7c0ee7eb5e4d767ad6f77\":[375.0,675.0],\"496bebcbe0e988a55171d5f1c617914b\":[375.0,375.0],\"0ec0a1b36f8b2bdbd3466da2233dc5bc\":[375.0,480.0],\"88da5afdad917ae4988534db7fd3ebf7\":[375.0,585.0],\"86bdffc762c7547e0414c3697a42790c\":[375.0,1125.0],\"bfecd5d9975c114f7b2659176ea9db95\":[375.0,1005.0],\"83a6c26e53767846ae32a4de1a2d7e66\":[615.0,1125.0],\"d4aac0f7fcc268d744ecd2de72947955\":[620.0,1227.0],\"d5485947fb78b9ab4e65b50fa94d9d34\":[870.0,1230.0]}",
+  "send_to_story_enabled": false,
+  "entry_agent_guid": null,
+  "exit_agent_guids": [],
+  "exit_agent_guid": null,
+  "send_to_stories": [],
+  "form": {
+    "name": "Example Two - Anomaly Event Form",
+    "description": "",
+    "fields": [],
+    "visibility": "tenant",
+    "agent_guid": null,
+    "success_message": "Thank you for your submission"
+  }
+}

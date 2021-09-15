@@ -1,0 +1,327 @@
+{
+  "schema_version": 3,
+  "name": "Example One - Compliance",
+  "description": null,
+  "guid": "162d59d5f8a223db33ef661fc8ab60a3",
+  "exported_at": "2021-09-15T11:35:34Z",
+  "agents": [
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "Receive Lacework Events",
+      "disabled": false,
+      "guid": "e2278dc449d5bc7e53f11e9ad4152e97",
+      "options": {
+        "secret": "9d63fa801b09c4fa74072b837d48c1df"
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Event by ID in Lacework",
+      "disabled": false,
+      "guid": "35b6a5dc30c873f92b9fa1ff5a28d2e1",
+      "options": {
+        "url": "https://{{ .RESOURCE.lacework_domain }}/api/v1/external/events/GetEventDetails?EVENT_ID={{.receive_lacework_events.body.event_id }}",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "{{.CREDENTIAL.lacework }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Post Message to Slack",
+      "disabled": false,
+      "guid": "807ba683799cd35a17b16efafe6a58b7",
+      "options": {
+        "url": "https://slack.com/api/chat.postMessage",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "channel": "engineering-team",
+          "attachments": [
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*New Lacework Alert*\n*Alert Title:* {{.receive_lacework_events.body.event_title }} {{.get_event_by_id_in_lacework.body.data.first.EVENT_ID }}\n*Description:* {{.receive_lacework_events.body.event_description }}\n*Event Type:* {{.get_event_by_id_in_lacework.body.data.first.EVENT_TYPE }}\n*Event Source:* {{.receive_lacework_events.body.event_source }}\nClick *<{{.receive_lacework_events.body.event_link }}|here>* to open the event in Lacework"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Resource:*\n{{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.NewViolation.first.RESOURCE }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Recommendation:*\n{{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.RecId.first.TITLE }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Bucket:*\n{{.extract_s3_bucket.bucket.first.first }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "This is Fine - Add Public Tags"
+                      },
+                      "style": "primary",
+                      "url": "{% prompt knowngood %}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "Make Bucket Private"
+                      },
+                      "style": "danger",
+                      "url": "{% prompt private %}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "headers": {
+          "Authorization": "Bearer {{ .CREDENTIAL.slack }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if OK",
+      "disabled": false,
+      "guid": "7b6caf9456109eceed4ce18fb81445dc",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "knowngood",
+            "path": "{{.post_message_to_slack.prompt.status }}"
+          }
+        ]
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Set AWS S3 PublicAccessBlock Policy",
+      "disabled": false,
+      "guid": "f78e401a52142357716962d3861ac5bb",
+      "options": {
+        "url": "https://{{.extract_s3_bucket.bucket.first.first }}.s3.eu-central-1.amazonaws.com/?tagging",
+        "method": "put",
+        "content_type": "application/xml",
+        "headers": {
+          "Authorization": "{{ .CREDENTIAL.aws_ec2 }}",
+          "Content-MD5": "{{.capture_tags.message | md5_base64 }}"
+        },
+        "payload": "<Tagging>\n  <TagSet>\n    <Tag>\n      <Key>Public</Key>\n      <Value>True</Value>\n    </Tag>\n  </TagSet>\n</Tagging>"
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Capture Tags",
+      "disabled": false,
+      "guid": "8a6ab407d9c3805ce83f1b35ad415dcf",
+      "options": {
+        "mode": "message_only",
+        "payload": {
+          "message": "<Tagging>\n  <TagSet>\n    <Tag>\n      <Key>Public</Key>\n      <Value>True</Value>\n    </Tag>\n  </TagSet>\n</Tagging>"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if Not Ok",
+      "disabled": false,
+      "guid": "835218c59988e5613013ec6e8b3822f4",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "private",
+            "path": "{{.post_message_to_slack.prompt.status }}"
+          }
+        ]
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get S3 Bucket Policy",
+      "disabled": false,
+      "guid": "49ab79f2b8669fe612159d117beeb8dc",
+      "options": {
+        "url": "https://bucket.s3.eu-central-1.amazonaws.com/?tagging",
+        "method": "get",
+        "content_type": "xml",
+        "headers": {
+          "Authorization": "{{ .CREDENTIAL.aws_ec2 }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Extract S3 Bucket",
+      "disabled": false,
+      "guid": "04db1cc4888ad54ae57a94f1b0271212",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{.get_event_by_id_in_lacework.body.data.first.ENTITY_MAP.Resource.first.VALUE }}",
+            "regexp": "s3:::([a-zA-Z0-9\\-]+)",
+            "to": "bucket"
+          }
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Make Bucket Private",
+      "disabled": false,
+      "guid": "642601299044a2f0ad05db1ef3403b39",
+      "options": {
+        "url": "https://{{.extract_s3_bucket.bucket.first.first }}.s3.eu-central-1.amazonaws.com/?publicAccessBlock",
+        "method": "put",
+        "content_type": "application/xml",
+        "headers": {
+          "Authorization": "{{ .CREDENTIAL.aws_ec2 }}"
+        },
+        "payload": "<PublicAccessBlockConfiguration>\n      <BlockPublicAcls>TRUE</BlockPublicAcls>\n      <IgnorePublicAcls>TRUE</IgnorePublicAcls>\n      <BlockPublicPolicy>TRUE</BlockPublicPolicy>\n    <RestrictPublicBuckets>TRUE</RestrictPublicBuckets>\n</PublicAccessBlockConfiguration>"
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Check Bucket Status",
+      "disabled": false,
+      "guid": "b569bbff915840b5407b785ce77ace04",
+      "options": {
+        "url": "https://bucket.s3.eu-central-1.amazonaws.com/?publicAccessBlock",
+        "method": "get",
+        "content_type": "application/xml",
+        "headers": {
+          "Authorization": "{{ .CREDENTIAL.aws_ec2 }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Make Bucket Public",
+      "disabled": false,
+      "guid": "8523d3791ed01d5d4aadb7eb9182ff12",
+      "options": {
+        "url": "https://bucket.s3.eu-central-1.amazonaws.com/?publicAccessBlock",
+        "method": "put",
+        "content_type": "application/xml",
+        "headers": {
+          "Authorization": "{{ .CREDENTIAL.aws_ec2 }}"
+        },
+        "payload": "<PublicAccessBlockConfiguration>\n      <BlockPublicAcls>FALSE</BlockPublicAcls>\n      <IgnorePublicAcls>FALSE</IgnorePublicAcls>\n      <BlockPublicPolicy>FALSE</BlockPublicPolicy>\n      <RestrictPublicBuckets>FALSE</RestrictPublicBuckets>\n</PublicAccessBlockConfiguration>"
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    }
+  ],
+  "diagram_notes": [
+    {
+      "content": "https://customerdemo.lacework.net/ui/images/lacework-logo-color.svg\n\n\n# Compliance Violations\ne.g. \n- Ensure the attached S3 bucket policy does not grant 'Allow' permission to everyone\n- Ingress from 0.0.0.0/0 on port 22\n- Security Group should not accept traffic other than 80 and 443\n- Ensure access keys are rotated every 90 days or less",
+      "position": [
+        -15.0,
+        210.0
+      ],
+      "guid": "19625cf59fa5f18ce68edb86e9b95636"
+    },
+    {
+      "content": "https://customerdemo.lacework.net/ui/images/lacework-logo-color.svg\n\n\n# Compliance Violation\nReset Environment",
+      "position": [
+        690.0,
+        1110.0
+      ],
+      "guid": "7fe06810c36270a00e4c44fbb0529685"
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 1
+    },
+    {
+      "source": 1,
+      "receiver": 8
+    },
+    {
+      "source": 2,
+      "receiver": 3
+    },
+    {
+      "source": 2,
+      "receiver": 6
+    },
+    {
+      "source": 3,
+      "receiver": 5
+    },
+    {
+      "source": 5,
+      "receiver": 4
+    },
+    {
+      "source": 6,
+      "receiver": 9
+    },
+    {
+      "source": 8,
+      "receiver": 2
+    },
+    {
+      "source": 11,
+      "receiver": 10
+    }
+  ],
+  "diagram_layout": "{\"e2278dc449d5bc7e53f11e9ad4152e97\":[345.0,210.0],\"35b6a5dc30c873f92b9fa1ff5a28d2e1\":[345.0,300.0],\"807ba683799cd35a17b16efafe6a58b7\":[345.0,480.0],\"7b6caf9456109eceed4ce18fb81445dc\":[585.0,615.0],\"f78e401a52142357716962d3861ac5bb\":[585.0,780.0],\"8a6ab407d9c3805ce83f1b35ad415dcf\":[585.0,690.0],\"835218c59988e5613013ec6e8b3822f4\":[345.0,615.0],\"49ab79f2b8669fe612159d117beeb8dc\":[990.0,945.0],\"04db1cc4888ad54ae57a94f1b0271212\":[345.0,390.0],\"642601299044a2f0ad05db1ef3403b39\":[345.0,780.0],\"b569bbff915840b5407b785ce77ace04\":[990.0,1125.0],\"8523d3791ed01d5d4aadb7eb9182ff12\":[990.0,1035.0]}",
+  "send_to_story_enabled": false,
+  "entry_agent_guid": null,
+  "exit_agent_guids": [],
+  "exit_agent_guid": null,
+  "send_to_stories": [],
+  "form": {
+    "name": "Example One - Compliance Form",
+    "description": "",
+    "fields": [],
+    "visibility": "tenant",
+    "agent_guid": null,
+    "success_message": "Thank you for your submission"
+  }
+}
