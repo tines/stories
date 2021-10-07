@@ -303,7 +303,7 @@
       "disabled": false,
       "guid": "86bdffc762c7547e0414c3697a42790c",
       "options": {
-        "url": "https://tinesio.atlassian.net/rest/api/2/issue/{{.create_issue_in_jira.body.key}}/transitions",
+        "url": "https://{{ .RESOURCE.atlassian_subdomain }}.atlassian.net/rest/api/2/issue/{{.create_issue_in_jira.body.key}}/transitions",
         "content_type": "json",
         "method": "post",
         "payload": {
@@ -326,7 +326,7 @@
       "disabled": false,
       "guid": "bfecd5d9975c114f7b2659176ea9db95",
       "options": {
-        "url": "https://tinesio.atlassian.net/rest/api/2/issue/{{.create_issue_in_jira.body.key}}/comment/",
+        "url": "https://{{ .RESOURCE.atlassian_subdomain }}.atlassian.net/rest/api/2/issue/{{.create_issue_in_jira.body.key}}/comment/",
         "content_type": "json",
         "method": "post",
         "payload": {
