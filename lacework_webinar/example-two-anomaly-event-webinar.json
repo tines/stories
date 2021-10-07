@@ -386,7 +386,7 @@
         },
         "headers": {
           "Authorization": "Token token={{ .CREDENTIAL.pagerduty }}",
-          "From": "thomas@tines.io"
+          "From": "{{ .RESOURCE.pagerduty_email }}"
         }
       },
       "schedule": null,
