@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "name": "Tines Security Chat Bot",
+  "description": "No description provided",
+  "guid": "c3f04485610f164c041eb5c011031df7",
+  "exported_at": "2019-07-30T11:52:26Z",
+  "agents": [
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Check URLHaus for Domain",
+      "disabled": false,
+      "guid": "0487eb5220e0a90a0936d61130f2b205",
+      "options": {
+        "url": "https://urlhaus-api.abuse.ch/v1/host/",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "host": "{{.explode_domains.individual_domain}}"
+        },
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1",
+        "fail_on_status": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "build results",
+      "disabled": false,
+      "guid": "3bf4d02d2333af03f97ce44d04aa750b",
+      "options": {
+        "mode": "message_only",
+        "forcepoint_category": "{{.search_domain_in_virustotal.body['Forcepoint ThreatSeeker category']}}",
+        "urlhaus": "{% if check_urlhaus_for_domain.body.query_status contains \"no_results\" %}Clean{% elsif .check_urlhaus_for_domain.body.url_count != 0 %}Malicious{% else %}Unknown{% endif %}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Reply with Acknowledgement",
+      "disabled": false,
+      "guid": "40dcca080ad9e76d190167e97d9f4f63",
+      "options": {
+        "url": "{{.receive_commands.serviceUrl}}/v3/conversations/{{.receive_commands.conversation.id}}/activities",
+        "method": "post",
+        "content_type": "json",
+        "payload": {
+          "type": "message",
+          "from": {
+            "id": "{{.receive_commands.recipient.id}}",
+            "name": "{{.receive_commands.recipient.name}}"
+          },
+          "recipient": {
+            "id": "{{.receive_commands.from.id}}",
+            "name": "{{.receive_commands.from.name}}"
+          },
+          "text": "We're analyzing the domain now - Sit Tight!"
+        },
+        "headers": {
+          "Authorization": "Bearer {{.get_bearer_token_from_microsoft.body.access_token}}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "receive commands",
+      "disabled": false,
+      "guid": "41aa10ac4bede6a21237497f09cc24f5",
+      "options": {
+        "secret": "5ab1b830c3fbe74b8db083b6ba2af863",
+        "verbs": "get,post",
+        "expected_update_period_in_days": 1
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Reply with Results",
+      "disabled": false,
+      "guid": "5ab8bdd9e4129e09a276cb74545018bc",
+      "options": {
+        "url": "{{.receive_commands.serviceUrl}}/v3/conversations/{{.receive_commands.conversation.id}}/activities",
+        "method": "post",
+        "content_type": "json",
+        "payload": {
+          "type": "message",
+          "from": {
+            "id": "{{.receive_commands.recipient.id}}",
+            "name": "{{.receive_commands.recipient.name}}"
+          },
+          "recipient": {
+            "id": "{{.receive_commands.from.id}}",
+            "name": "{{.receive_commands.from.name}}"
+          },
+          "text": "We have completed analysis of the domain {{.explode_domains.individual_domain}}.<br><b>Forcepoint Categorization:</b> {{.build_results.forcepoint_category}}<br><b>URLHaus Categorization:</b> {{.build_results.urlhaus}}"
+        },
+        "headers": {
+          "Authorization": "Bearer {{.get_bearer_token_from_microsoft.body.access_token}}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "search domain in virustotal",
+      "disabled": false,
+      "guid": "76115498e3d5c83b5a8249b00e894582",
+      "options": {
+        "url": "https://www.virustotal.com/vtapi/v2/domain/report",
+        "method": "get",
+        "payload": {
+          "apikey": "{% credential virustotal %}",
+          "domain": "{{.explode_domains.individual_domain}}"
+        },
+        "expected_update_period_in_days": "1",
+        "fail_on_status": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if AnalyzeDomain",
+      "disabled": false,
+      "guid": "82380704004069f358469fa6a5cf19f6",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "path": "{{.receive_commands.text}}",
+            "value": "analyzedomain"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Bearer Token from Microsoft",
+      "disabled": false,
+      "guid": "83f28df275883cec327d473a94233994",
+      "options": {
+        "url": "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "grant_type": "client_credentials",
+          "client_id": "f7aba91c-d4c8-4034-89b0-f5c1d60c4b39",
+          "client_secret": "{% credential teams_bot %}",
+          "scope": "https://api.botframework.com/.default"
+        },
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "extract domains",
+      "disabled": false,
+      "guid": "8a066ca30e2b279acf1708b89a1bd5fc",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{.receive_commands.text}}",
+            "regexp": "(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]",
+            "to": "domain"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "explode domains",
+      "disabled": false,
+      "guid": "b0224de79c099f5e032781c8c136016f",
+      "options": {
+        "mode": "explode",
+        "path": "{{.extract_domains.domain}}",
+        "to": "individual_domain",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 1
+    },
+    {
+      "source": 1,
+      "receiver": 4
+    },
+    {
+      "source": 3,
+      "receiver": 7
+    },
+    {
+      "source": 5,
+      "receiver": 0
+    },
+    {
+      "source": 6,
+      "receiver": 8
+    },
+    {
+      "source": 6,
+      "receiver": 2
+    },
+    {
+      "source": 7,
+      "receiver": 6
+    },
+    {
+      "source": 8,
+      "receiver": 9
+    },
+    {
+      "source": 9,
+      "receiver": 5
+    }
+  ],
+  "control_links": [
+
+  ]
+}
