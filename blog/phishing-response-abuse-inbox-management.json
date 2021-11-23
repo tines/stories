@@ -1,0 +1,1191 @@
+{
+  "schema_version": 1,
+  "name": "Phishing response abuse inbox management",
+  "description": "No description provided",
+  "guid": "fcf222259bf65403def61452f66a1ffe",
+  "exported_at": "2018-09-05T17:07:49Z",
+  "agents": [
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "DHCP search complete",
+      "disabled": false,
+      "guid": "080b48684856d6bf023fbfb44ade5789",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "DONE",
+            "path": "{{.get_dhcp_search_status.body.entry[0].content.dispatchState}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::IMAPAgent",
+      "name": "Check inbox",
+      "disabled": false,
+      "guid": "08cc8b995a10cdaceda400a5047000fb",
+      "options": {
+        "host": "box.tines.xyz",
+        "username": "report-phishing@tines.xyz",
+        "password": "{% credential Report-phishing-imap %}",
+        "ssl": true,
+        "folders": [
+          "INBOX"
+        ],
+        "conditions": {
+
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 2592000
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "File scan still in progress",
+      "disabled": false,
+      "guid": "0b76d950e6754d06cf102747f2ca255b",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "-2",
+            "path": "{{.check_status_of_file_scan.body.response_code}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get host from DHCP logs single result",
+      "disabled": false,
+      "guid": "0badac7433266d12f939b4d39767988c",
+      "options": {
+        "url": "https://spunk.tines.xyz:8089/services/search/jobs",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "search": "search host=dhcp \"IP Address\"={{.get_search_results.body.results.result.field[0].value.text}} (Description=New OR Description=Renew) | head 1 | fields \"Host Name\"",
+          "output_mode": "json",
+          "earliest_time": "{{.get_search_results.body.results.result.field[1].value.text | date: '%s' | minus: 43200}}",
+          "latest_time": "{{.get_search_results.body.results.result.field[1].value.text | date: '%s'}}"
+        },
+        "headers": {
+          "Authorization": "Basic {% credential tinesio_splunk %}"
+        },
+        "expected_update_period_in_days": "1",
+        "disable_ssl_verification": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Found matching host",
+      "disabled": false,
+      "guid": "20a259c86bd93c8571292d9454fae5e8",
+      "options": {
+        "rules": [
+          {
+            "type": "field>value",
+            "value": "0",
+            "path": "{{.get_dhcp_search_status.body.entry[0].content.eventCount}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "URL is malicious",
+      "disabled": false,
+      "guid": "22b8a17c60aba5d0fe474b15613b401d",
+      "options": {
+        "rules": [
+          {
+            "type": "field>value",
+            "value": "0",
+            "path": "{{ .submit_to_vt.body.positives }}"
+          },
+          {
+            "type": "field>value",
+            "value": "0",
+            "path": "{{.get_urlscan_results.body.stats.malicious}}"
+          }
+        ],
+        "expected_update_period_in_days": "2",
+        "must_match": "1"
+      },
+      "keep_events_for": 2592000
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Hash found in virustotal ",
+      "disabled": false,
+      "guid": "27f1d1440c71fdc8de027ccdf1099a67",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "1",
+            "path": "{{.search_virustotal_for_hash.body.response_code}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Submit file to virustotal",
+      "disabled": false,
+      "guid": "28b2229dd544a4c36375e4c6aa2018a6",
+      "options": {
+        "url": "https://www.virustotal.com/vtapi/v2/file/scan",
+        "content_type": "data",
+        "method": "post",
+        "payload": {
+          "file": {
+            "contents": "{{.explode_attachments.attachment.base64encodedcontents | base64_decode}}",
+            "filename": "{{.explode_attachments.attachment.filename}}"
+          },
+          "apikey": "{% credential Virustotal %}"
+        },
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get search results",
+      "disabled": false,
+      "guid": "299c1a19c754a87076541ac9def66ffe",
+      "options": {
+        "url": "https://spunk.tines.xyz:8089/services/search/jobs/{{.search_siem_for_visits_to_malicious_domain.body.sid}}/results/",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Basic {% credential tinesio_splunk %}"
+        },
+        "expected_update_period_in_days": "1",
+        "disable_ssl_verification": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Search virustotal for hash",
+      "disabled": false,
+      "guid": "29f7097802eac1cb2cd8f8e70d6b91cc",
+      "options": {
+        "url": "https://www.virustotal.com/vtapi/v2/file/report",
+        "method": "get",
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1",
+        "payload": {
+          "apikey": "{% credential Virustotal %}",
+          "resource": "{{.explode_attachments.attachment.md5}}"
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 2592000
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Find additional user details",
+      "disabled": false,
+      "guid": "2b2b94c9bcc0327567a5189cbd26c6e6",
+      "options": {
+        "url": "https://api.us.onelogin.com/api/1/users?email={{.get_asset_owner.body.issues[0].fields.assignee.emailAddress}}",
+        "method": "get",
+        "headers": {
+          "authorization": "bearer:{% credential OneLogin %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 2592000
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Submit to VT",
+      "disabled": false,
+      "guid": "33728b405618464daaa0d6713bc2c5bd",
+      "options": {
+        "url": "https://www.virustotal.com/vtapi/v2/url/report?apikey={% credential Virustotal %}&resource={{.explode_urls.url}}",
+        "method": "get",
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 2592000
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "User confirmed interaction with malicious email",
+      "disabled": false,
+      "guid": "35d65c1fa1d50b3149905879243e1d02",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "clicked",
+            "path": "{{.contact_victim.prompt.status}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get URLScan Results",
+      "disabled": false,
+      "guid": "37f4a22109730f12c0f95ee48748db01",
+      "options": {
+        "url": "https://urlscan.io/api/v1/result/{{.scan_url_in_urlscan_io.body.uuid}}",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode attachments",
+      "disabled": false,
+      "guid": "430a7d3fa494011e1dcb5732a8a796ce",
+      "options": {
+        "mode": "explode",
+        "path": "{{.check_inbox.attachments}}",
+        "to": "attachment",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Hash found in Hybrid",
+      "disabled": false,
+      "guid": "449843d8e5333ca186cc8b3b96512f89",
+      "options": {
+        "rules": [
+          {
+            "type": "field>value",
+            "value": "0",
+            "path": "{{ .check_hybrid_analysis_for_hash.body | size }}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "DHCP search still in progress",
+      "disabled": false,
+      "guid": "49c780e9e2a8e402d506b44d32d9bea7",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "RUNNING",
+            "path": "{{.get_dhcp_search_status.body.entry[0].content.dispatchState}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Check status of file scan",
+      "disabled": false,
+      "guid": "56f10901c99ae4e6e5b60218d46e13b6",
+      "options": {
+        "url": "https://www.virustotal.com/vtapi/v2/file/report",
+        "method": "get",
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1",
+        "payload": {
+          "apikey": "{% credential Virustotal %}",
+          "resource": "{{.explode_attachments.attachment.md5}}"
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 2592000
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Hybrid file scan still in progress",
+      "disabled": false,
+      "guid": "57a30fe2834f1d04900219df3c37ff07",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "IN_PROGRESS",
+            "path": "{{.check_status_of_hybrid_file_scan.body.state}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Lock victim account",
+      "disabled": false,
+      "guid": "62376b42457dc73f7b46f0b8f2e0dc2f",
+      "options": {
+        "url": "https://api.us.onelogin.com/api/1/users/{{.get_victim_details.body.data[0].id}}{{.find_additional_user_details.body.data[0].id}}",
+        "method": "put",
+        "content_type": "json",
+        "payload": {
+          "status": "3"
+        },
+        "headers": {
+          "authorization": "bearer:{% credential OneLogin %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "One search result",
+      "disabled": false,
+      "guid": "6424b3a1c391b38cc09c7a72a162c8a6",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "1",
+            "path": "{{.get_search_status.body.entry[0].content.eventCount}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get host from DHCP logs multiple results",
+      "disabled": false,
+      "guid": "759366c872b4a14006dccbbab0a41cf9",
+      "options": {
+        "url": "https://spunk.tines.xyz:8089/services/search/jobs",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "search": "search host=dhcp \"IP Address\"={{.explode_search_results.result.field[0].value.text}} (Description=New OR Description=Renew) | head 1 | fields \"Host Name\"",
+          "output_mode": "json",
+          "earliest_time": "{{.explode_search_results.result.field[1].value.text | date: '%s' | minus: 43200 | as_object}}",
+          "latest_time": "{{.explode_search_results.result.field[1].value.text | date: '%s'}}"
+        },
+        "headers": {
+          "Authorization": "Basic {% credential tinesio_splunk %}"
+        },
+        "expected_update_period_in_days": "1",
+        "disable_ssl_verification": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get asset owner",
+      "disabled": false,
+      "guid": "762d84e3483e51e6a41e8b346dff1765",
+      "options": {
+        "url": "https://tinesio.atlassian.net/rest/api/2/search",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "jql": "project=AM AND 'Asset ID' ~ {{.get_dhcp_search_results.body.results.result.field[0].value.text}}"
+        },
+        "basic_auth": [
+          "eoin@tines.io",
+          "{% credential tinesio_jira %}"
+        ],
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode URLs",
+      "disabled": false,
+      "guid": "785ddd25a7033ec4d88f38448f94c295",
+      "options": {
+        "mode": "explode",
+        "path": "{{.extract_urls.urls}}",
+        "to": "url",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 2592000
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Extract domain",
+      "disabled": false,
+      "guid": "7d52d63a40207a8ddb7f0b45493e29f6",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{.explode_urls.url}}",
+            "regexp": "^(?:https?:\\/\\/)?(?:[^@\\n]+@)?(?:www\\.)?([^:\\/\\n?]+)",
+            "to": "domain"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Search SIEM for visits to malicious domain",
+      "disabled": false,
+      "guid": "80396832d92d838c7482e3f7623b5bba",
+      "options": {
+        "url": "https://spunk.tines.xyz:8089/services/search/jobs",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "search": "search source=proxy host=webproxy sourcetype=Bluecoat {{.extract_domain.domain}}  | fields s_ip _time",
+          "output_mode": "json"
+        },
+        "headers": {
+          "Authorization": "Basic {% credential tinesio_splunk %}"
+        },
+        "expected_update_period_in_days": "1",
+        "disable_ssl_verification": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Could not find matching host",
+      "disabled": false,
+      "guid": "8258927c0f89522838cf4aeb7625b57f",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "0",
+            "path": "{{.get_dhcp_search_status.body.entry[0].content.eventCount}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EmailAgent",
+      "name": "Contact victim",
+      "disabled": false,
+      "guid": "896c159361bea18ab0e07d3cb9bd4578",
+      "options": {
+        "recipients": "{{.check_inbox.from}}",
+        "subject": "You received a malicious email",
+        "body": "Hi {{.get_victim_details.body.data[0].firstname}},<br/><br/>Thank you for recently reporting a suspicious email.The details of which are shown below. Our analysis indicates that this file was malicious. If you interacted with this email, either clicking a link or opening an atttachment, please alert Information Security by clicking the following link: <a href=\\\"{% prompt clicked %}\\\">{% prompt clicked %}</a>. If you did not click this link there is no further action required.<br/><br/><b>Malicous email details:</b><br /><b>Subject: </b> {{.check_inbox.subject}}<br /><b>Sent to report-phishing at: </b>{{.check_inbox.date}}<br /><br>Thank you,<br />Infromation Security",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 2592000
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Search still in progress",
+      "disabled": false,
+      "guid": "8e63a0fe2d7cea56e8c9e031e227b957",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "RUNNING",
+            "path": "{{.get_search_status.body.entry[0].content.dispatchState}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Extract URLs",
+      "disabled": false,
+      "guid": "9def2d418d492a3eb81a1b2adc521060",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{.check_inbox.body}}",
+            "regexp": "https?:\\/\\/[\\S]+",
+            "to": "urls"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 2592000
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Check hybrid analysis for hash",
+      "disabled": false,
+      "guid": "a6fe82380aa3325237df31c68f98257c",
+      "options": {
+        "url": "https://www.hybrid-analysis.com/api/v2/search/hash",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "hash": "{{.explode_attachments.attachment.md5}}",
+          "user-agent": "Falcon Sandbox"
+        },
+        "headers": {
+          "api-key": "{% credential Hybrid %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Hash not found in Hybrid",
+      "disabled": false,
+      "guid": "a7546c8e4ac692ef3f8e6b5dbfc842cc",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "0",
+            "path": "{{ .check_hybrid_analysis_for_hash.body | size }}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Search complete",
+      "disabled": false,
+      "guid": "ab33f53fd4e1d24f601ebc22078ef42f",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "DONE",
+            "path": "{{.get_search_status.body.entry[0].content.dispatchState}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get DHCP search results",
+      "disabled": false,
+      "guid": "b29a631ec8a1038ef94025c9db6fc0fe",
+      "options": {
+        "url": "https://spunk.tines.xyz:8089/services/search/jobs/{{.get_host_from_dhcp_logs_single_result.body.sid}}{{.get_host_from_dhcp_logs_multiple_results.body.sid}}/results/",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Basic {% credential tinesio_splunk %}"
+        },
+        "expected_update_period_in_days": "1",
+        "disable_ssl_verification": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get victim details",
+      "disabled": false,
+      "guid": "b76626b430a90021598a9a8ad5c2b34e",
+      "options": {
+        "url": "https://api.us.onelogin.com/api/1/users?email={{.check_inbox.from}}",
+        "method": "get",
+        "headers": {
+          "authorization": "bearer:{% credential OneLogin %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 2592000
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Hash not found in virustotal",
+      "disabled": false,
+      "guid": "b7da0a56b2753ca024974e169fe30bab",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "0",
+            "path": "{{.search_virustotal_for_hash.body.response_code}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Urlscan not found still in progress",
+      "disabled": false,
+      "guid": "be668aaf4dbd11bb73f73d81509a885c",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "404",
+            "path": "{{.get_urlscan_results.status}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Urlscan complete",
+      "disabled": false,
+      "guid": "c0accbb8f64c4bd4e55220cf683837a2",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "200",
+            "path": "{{.get_urlscan_results.status}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Multiple search results",
+      "disabled": false,
+      "guid": "c0c4245cebf38b8ab152f55105a47421",
+      "options": {
+        "rules": [
+          {
+            "type": "field>value",
+            "value": "1",
+            "path": "{{.get_search_status.body.entry[0].content.eventCount}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get search status",
+      "disabled": false,
+      "guid": "c36b6e27183c2d2d03518a943c3e977a",
+      "options": {
+        "url": "https://spunk.tines.xyz:8089/services/search/jobs/{{.search_siem_for_visits_to_malicious_domain.body.sid}}?output_mode=json",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Basic {% credential tinesio_splunk %}"
+        },
+        "expected_update_period_in_days": "1",
+        "disable_ssl_verification": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "File is malicious",
+      "disabled": false,
+      "guid": "cbfa2ae4b020bc31e1b265ab56a83c29",
+      "options": {
+        "rules": [
+          {
+            "type": "field>=value",
+            "value": "1",
+            "path": "{{.search_virustotal_for_hash.body.positives}}{{.check_status_of_file_scan.body.positives}}"
+          },
+          {
+            "type": "field>=value",
+            "value": "25",
+            "path": "{{.get_hybrid_scan_results.body.threat_score}}{{.check_hybrid_analysis_for_hash.body[*].threat_score}}"
+          }
+        ],
+        "expected_update_period_in_days": "2",
+        "must_match": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Hybrid file scan complete",
+      "disabled": false,
+      "guid": "cd1c5e8d25c3c5a71d72570347c09475",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "SUCCESS",
+            "path": "{{.check_status_of_hybrid_file_scan.body.state}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Check status of hybrid file scan",
+      "disabled": false,
+      "guid": "cec51f95722dbd7070390c367dc9184e",
+      "options": {
+        "url": "https://www.hybrid-analysis.com/api/v2/report/{{.submit_file_to_hybrid_analysis.body.job_id}}/state",
+        "method": "get",
+        "headers": {
+          "api-key": "{% credential Hybrid %}"
+        },
+        "expected_update_period_in_days": "1",
+        "user_agent": "Falcon Sandbox"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get DHCP search status",
+      "disabled": false,
+      "guid": "d37fd15732472a53d680e45aa96fdb5e",
+      "options": {
+        "url": "https://spunk.tines.xyz:8089/services/search/jobs/{{.get_host_from_dhcp_logs_single_result.body.sid}}{{.get_host_from_dhcp_logs_multiple_results.body.sid}}?output_mode=json",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Basic {% credential tinesio_splunk %}"
+        },
+        "expected_update_period_in_days": "1",
+        "disable_ssl_verification": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Hybrid scan not in progress or complete",
+      "disabled": false,
+      "guid": "d80cac5ce330ce4ffb0894360f458fa1",
+      "options": {
+        "rules": [
+          {
+            "type": "!regex",
+            "value": "SUCCESS",
+            "path": "{{.check_status_of_hybrid_file_scan.body.state}}"
+          },
+          {
+            "type": "!regex",
+            "value": "IN_PROGRESS",
+            "path": "{{.check_status_of_hybrid_file_scan.body.state}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Scan URL in URLScan.io",
+      "disabled": false,
+      "guid": "e421370d691ad1403fe5167e97c03558",
+      "options": {
+        "url": "https://urlscan.io/api/v1/scan/",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "url": "{{.explode_urls.url}}",
+          "public": "on"
+        },
+        "headers": {
+          "API-Key": "{% credential URLScan.io %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode search results",
+      "disabled": false,
+      "guid": "ea4883b4d1bf2429e9caf11b999ac1d9",
+      "options": {
+        "mode": "explode",
+        "path": "{{.get_search_results.body.results.result}}",
+        "to": "result",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Log out victim",
+      "disabled": false,
+      "guid": "eea43ddd5f1d7e81b930c9571837a36e",
+      "options": {
+        "url": "https://api.us.onelogin.com/api/1/users/{{.get_victim_details.body.data[0].id}}{{.find_additional_user_details.body.data[0].id}}/logout",
+        "method": "put",
+        "headers": {
+          "authorization": "bearer:{% credential OneLogin %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "File scan is complete",
+      "disabled": false,
+      "guid": "f2c06bade1dd62e05fd3c0bc0559f7d8",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "1",
+            "path": "{{.check_status_of_file_scan.body.response_code}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get hybrid scan results",
+      "disabled": false,
+      "guid": "f8a0040b7c2f03f530889408de88f6b0",
+      "options": {
+        "url": "https://www.hybrid-analysis.com/api/v2/report/{{.submit_file_to_hybrid_analysis.body.job_id}}/summary",
+        "method": "get",
+        "headers": {
+          "api-key": "{% credential Hybrid %}"
+        },
+        "expected_update_period_in_days": "1",
+        "user_agent": "Falcon Sandbox"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Submit file to Hybrid analysis",
+      "disabled": false,
+      "guid": "fca5519a8d51f8b4e44bf89ecc72dc8d",
+      "options": {
+        "url": "https://www.hybrid-analysis.com/api/v2/submit/file",
+        "content_type": "data",
+        "method": "post",
+        "payload": {
+          "user-agent": "Falcon Sandbox",
+          "environment_id": "110",
+          "file": {
+            "contents": "{{.explode_attachments.attachment.base64encodedcontents | base64_decode}}",
+            "filename": "{{.explode_attachments.attachment.filename}}"
+          }
+        },
+        "headers": {
+          "api-key": "{% credential Hybrid %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 3600
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 33
+    },
+    {
+      "source": 1,
+      "receiver": 29
+    },
+    {
+      "source": 1,
+      "receiver": 14
+    },
+    {
+      "source": 2,
+      "receiver": 17
+    },
+    {
+      "source": 3,
+      "receiver": 43
+    },
+    {
+      "source": 4,
+      "receiver": 22
+    },
+    {
+      "source": 5,
+      "receiver": 34
+    },
+    {
+      "source": 5,
+      "receiver": 24
+    },
+    {
+      "source": 6,
+      "receiver": 40
+    },
+    {
+      "source": 7,
+      "receiver": 17
+    },
+    {
+      "source": 8,
+      "receiver": 20
+    },
+    {
+      "source": 8,
+      "receiver": 38
+    },
+    {
+      "source": 9,
+      "receiver": 35
+    },
+    {
+      "source": 9,
+      "receiver": 6
+    },
+    {
+      "source": 10,
+      "receiver": 47
+    },
+    {
+      "source": 11,
+      "receiver": 5
+    },
+    {
+      "source": 12,
+      "receiver": 47
+    },
+    {
+      "source": 13,
+      "receiver": 36
+    },
+    {
+      "source": 13,
+      "receiver": 37
+    },
+    {
+      "source": 14,
+      "receiver": 30
+    },
+    {
+      "source": 14,
+      "receiver": 9
+    },
+    {
+      "source": 15,
+      "receiver": 40
+    },
+    {
+      "source": 16,
+      "receiver": 43
+    },
+    {
+      "source": 17,
+      "receiver": 2
+    },
+    {
+      "source": 17,
+      "receiver": 48
+    },
+    {
+      "source": 18,
+      "receiver": 42
+    },
+    {
+      "source": 20,
+      "receiver": 3
+    },
+    {
+      "source": 21,
+      "receiver": 43
+    },
+    {
+      "source": 22,
+      "receiver": 10
+    },
+    {
+      "source": 23,
+      "receiver": 11
+    },
+    {
+      "source": 23,
+      "receiver": 45
+    },
+    {
+      "source": 24,
+      "receiver": 25
+    },
+    {
+      "source": 25,
+      "receiver": 39
+    },
+    {
+      "source": 27,
+      "receiver": 12
+    },
+    {
+      "source": 28,
+      "receiver": 39
+    },
+    {
+      "source": 29,
+      "receiver": 23
+    },
+    {
+      "source": 30,
+      "receiver": 15
+    },
+    {
+      "source": 30,
+      "receiver": 31
+    },
+    {
+      "source": 31,
+      "receiver": 50
+    },
+    {
+      "source": 32,
+      "receiver": 8
+    },
+    {
+      "source": 33,
+      "receiver": 26
+    },
+    {
+      "source": 33,
+      "receiver": 4
+    },
+    {
+      "source": 34,
+      "receiver": 27
+    },
+    {
+      "source": 35,
+      "receiver": 7
+    },
+    {
+      "source": 36,
+      "receiver": 13
+    },
+    {
+      "source": 37,
+      "receiver": 5
+    },
+    {
+      "source": 38,
+      "receiver": 46
+    },
+    {
+      "source": 39,
+      "receiver": 28
+    },
+    {
+      "source": 39,
+      "receiver": 32
+    },
+    {
+      "source": 40,
+      "receiver": 34
+    },
+    {
+      "source": 41,
+      "receiver": 49
+    },
+    {
+      "source": 42,
+      "receiver": 18
+    },
+    {
+      "source": 42,
+      "receiver": 41
+    },
+    {
+      "source": 42,
+      "receiver": 44
+    },
+    {
+      "source": 43,
+      "receiver": 16
+    },
+    {
+      "source": 43,
+      "receiver": 0
+    },
+    {
+      "source": 45,
+      "receiver": 13
+    },
+    {
+      "source": 46,
+      "receiver": 21
+    },
+    {
+      "source": 47,
+      "receiver": 19
+    },
+    {
+      "source": 48,
+      "receiver": 40
+    },
+    {
+      "source": 49,
+      "receiver": 40
+    },
+    {
+      "source": 50,
+      "receiver": 42
+    }
+  ],
+  "control_links": [
+
+  ]
+}

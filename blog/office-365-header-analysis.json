@@ -1,0 +1,335 @@
+{
+  "schema_version": 1,
+  "name": "office 365 header analysis",
+  "description": "office 365 header analysis with recursion",
+  "guid": "4b98a77fd7238b0678ae944c64137809",
+  "exported_at": "2019-05-02T10:01:41Z",
+  "agents": [
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "search IP in Talos Intelligence",
+      "disabled": false,
+      "guid": "150c10872d099dcd94f93f14a7e272a3",
+      "options": {
+        "url": "https://talosintelligence.com/sb_api/query_lookup",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "query": "/api/v2/details/ip/",
+          "query_entry": "{{.explode_ips.ip}}"
+        },
+        "headers": {
+          "Referer": "https://talosintelligence.com/reputation_center/lookup?search="
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "explode individual emails",
+      "disabled": false,
+      "guid": "16d8c356c3c8aac4e247d0fc6bbc644e",
+      "options": {
+        "mode": "explode",
+        "path": "{{.get_email_from_msgraph.body.value}}",
+        "to": "individual_email",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "trigger if ms item attachment",
+      "disabled": false,
+      "guid": "18a7abc86858157446ea57f8f2f2032b",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "#microsoft.graph.itemAttachment",
+            "path": "{{.explode_attachments.attachment }}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "get last received header",
+      "disabled": false,
+      "guid": "358bea19edfa5bdf51ee18ee6d9bd629",
+      "options": {
+        "mode": "message_only",
+        "original_last_received_header": "{% assign last_received_header = get_email_headers.body.internetMessageHeaders | where:\"name\",\"Received\" %}{{last_received_header.last | as_object}}",
+        "attachment_last_received_header": "{% assign last_received_header = get_email_headers_from_attachment.body.item.internetMessageHeaders | where:\"name\",\"Received\" %}{{last_received_header.last | as_object}}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "extract ips from received headers",
+      "disabled": false,
+      "guid": "434ee205b76854dc4d236db8d84d39ef",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{.get_email_headers.body.internetMessageHeaders| where:\\\"name\\\",\\\"Received\\\" }}{{.get_email_headers_from_attachment.body.item.internetMessageHeaders| where:\\\"name\\\",\\\"Received\\\" }}",
+            "regexp": "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b",
+            "to": "ips"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "explode attachments",
+      "disabled": false,
+      "guid": "4d4fbc1d548c4f537ff94e4a3cf97e66",
+      "options": {
+        "mode": "explode",
+        "path": "{{.explode_individual_emails.individual_email.attachments}}",
+        "to": "attachment",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Email Headers from Attachment",
+      "disabled": false,
+      "guid": "79021b7d0230f76eda06ede65359f694",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/me/messages/{{.explode_individual_emails.individual_email.id}}/attachments/{{.explode_attachments.attachment.id}}/?$expand=microsoft.graph.itemattachment/item",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {% credential eoin_test %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "trigger if Emotet Header",
+      "disabled": false,
+      "guid": "7e798b184a78e80ac141da74b634ee2b",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "([0-9]{20}).([0-9a-fA-F]{16})@([0-9a-zA-Z-]+.){3}",
+            "path": "{{.get_email_headers.body.internetMessageHeaders| where:\\\"name\\\",\\\"Message-ID\\\" }}{{.get_email_headers_from_attachment.body.item.internetMessageHeaders| where:\\\"name\\\",\\\"Message-ID\\\" }}"
+          },
+          {
+            "type": "regex",
+            "value": "([0-9A-Fa-f]{2}).([0-9A-Fa-f]{2}).([0-9A-Fa-f]{5}).([0-9A-Fa-f]{8})@([0-9a-zA-Z-]+.){3}",
+            "path": "{{.get_email_headers.body.internetMessageHeaders| where:\\\"name\\\",\\\"Message-ID\\\" }}{{.get_email_headers_from_attachment.body.item.internetMessageHeaders| where:\\\"name\\\",\\\"Message-ID\\\" }}"
+          },
+          {
+            "type": "regex",
+            "value": "([0-9A-Fa-f]{51})@([0-9a-zA-Z-]+.){3}",
+            "path": "{{.get_email_headers.body.internetMessageHeaders| where:\\\"name\\\",\\\"Message-ID\\\" }}{{.get_email_headers_from_attachment.body.item.internetMessageHeaders| where:\\\"name\\\",\\\"Message-ID\\\" }}"
+          }
+        ],
+        "must_match": "1",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "check dmarc, dkim and spf",
+      "disabled": false,
+      "guid": "bc12d2f55f7bac6a2a85cfdc8f0c6ef5",
+      "options": {
+        "mode": "message_only",
+        "dkim": "{% if .get_email_headers.body.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"dkim=pass\" %}pass{% elsif .get_email_headers_from_attachment.body.item.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"dkim=pass\" %}pass{% elsif .get_email_headers.body.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"dkim=fail\" %}fail{% elsif .get_email_headers_from_attachment.body.item.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"dkim=fail\" %}fail{% else %}none{% endif %}",
+        "spf": "{% if .get_email_headers.body.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"spf=pass\" %}pass{% elsif .get_email_headers_from_attachment.body.item.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"spf=pass\" %}pass{% elsif .get_email_headers.body.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"spf=fail\" %}fail{% elsif .get_email_headers_from_attachment.body.item.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"spf=fail\" %}fail{% else %}none{% endif %}",
+        "dmarc": "{% if .get_email_headers.body.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"dmarc=pass\" %}pass{% elsif .get_email_headers_from_attachment.body.item.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"dmarc=pass\" %}pass{% elsif .get_email_headers.body.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"dmarc=fail\" %}fail{% elsif .get_email_headers_from_attachment.body.item.internetMessageHeaders | where:\"name\",\"Authentication-Results\" contains \"dmarc=fail\" %}fail{% else %}none{% endif %}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "trigger if attachments",
+      "disabled": false,
+      "guid": "bd6b3cde871172e212e3c3ad0827a8ff",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "true",
+            "path": "{{.explode_individual_emails.individual_email.hasAttachments}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Email from MSGraph",
+      "disabled": false,
+      "guid": "c582443d34684658701b9f7f6f2ec6d1",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/me/mailFolders/Inbox/messages?$filter=isRead ne true&expand=attachments",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {% credential eoin_test %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Email Headers",
+      "disabled": false,
+      "guid": "e472ad3e4e4706c079a3572e1a8a254f",
+      "options": {
+        "url": "https://graph.microsoft.com/beta/me/messages/{{.explode_individual_emails.individual_email.id}}/?$select=internetMessageHeaders",
+        "method": "get",
+        "content_type": "json",
+        "headers": {
+          "Authorization": "Bearer {% credential eoin_test %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Mark Emails as Read",
+      "disabled": false,
+      "guid": "f54b7bd44a82fb953c5ec1f1ddbb1c89",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/me/messages/{{.explode_individual_emails.individual_email.id}}",
+        "method": "patch",
+        "content_type": "json",
+        "payload": {
+          "isRead": "True"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential eoin_test %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "explode ips",
+      "disabled": false,
+      "guid": "f88496a4c543226e553c002f2e1de3f6",
+      "options": {
+        "mode": "explode",
+        "path": "{{.extract_ips_from_received_headers.ips }}",
+        "to": "ip",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "dedupe ips by message id",
+      "disabled": false,
+      "guid": "fb8f3ff4851038ed649ea17ad9a594fa",
+      "options": {
+        "mode": "deduplicate",
+        "lookback": "100",
+        "path": "{{.explode_ips.ip}}{{.explode_individual_emails.individual_email.internetMessageId}}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 1,
+      "receiver": 12
+    },
+    {
+      "source": 1,
+      "receiver": 11
+    },
+    {
+      "source": 2,
+      "receiver": 6
+    },
+    {
+      "source": 4,
+      "receiver": 13
+    },
+    {
+      "source": 5,
+      "receiver": 2
+    },
+    {
+      "source": 6,
+      "receiver": 4
+    },
+    {
+      "source": 6,
+      "receiver": 7
+    },
+    {
+      "source": 6,
+      "receiver": 8
+    },
+    {
+      "source": 6,
+      "receiver": 3
+    },
+    {
+      "source": 9,
+      "receiver": 5
+    },
+    {
+      "source": 10,
+      "receiver": 1
+    },
+    {
+      "source": 11,
+      "receiver": 4
+    },
+    {
+      "source": 11,
+      "receiver": 7
+    },
+    {
+      "source": 11,
+      "receiver": 8
+    },
+    {
+      "source": 11,
+      "receiver": 3
+    },
+    {
+      "source": 12,
+      "receiver": 9
+    },
+    {
+      "source": 13,
+      "receiver": 14
+    },
+    {
+      "source": 14,
+      "receiver": 0
+    }
+  ],
+  "control_links": [
+
+  ]
+}

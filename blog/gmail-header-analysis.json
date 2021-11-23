@@ -1,0 +1,363 @@
+{
+  "schema_version": 1,
+  "name": "gmail header analysis",
+  "description": "No description provided",
+  "guid": "0047c38e69000b326dd94e3a2c0f2a9c",
+  "exported_at": "2019-05-02T11:24:07Z",
+  "agents": [
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "dedupe ips by message id",
+      "disabled": false,
+      "guid": "06676c9f33ebf03fff5f56fb38ead99c",
+      "options": {
+        "mode": "deduplicate",
+        "lookback": "100",
+        "path": "{{.explode_ips.ip}}{{.explode_individual_emails.individual_email.id}}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "trigger if .eml",
+      "disabled": false,
+      "guid": "10fd37daf87fbc9dc59919c486d62ed2",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "message/rfc822",
+            "path": "{{.explode_attachments.attachment.mimeType}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Email from GMail",
+      "disabled": false,
+      "guid": "2014cdaa46e967f81507a2424373b5ad",
+      "options": {
+        "url": "https://www.googleapis.com/gmail/v1/users/thomas@tines.io/messages",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "q": "is:unread"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential google %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "explode attachments",
+      "disabled": false,
+      "guid": "395737520899797ccfd9de31c178180a",
+      "options": {
+        "mode": "explode",
+        "path": "{{.read_email.body.payload.parts}}",
+        "to": "attachment",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "get last received header",
+      "disabled": false,
+      "guid": "3cc34f3f2c4b76b1cb3fc99be55b958f",
+      "options": {
+        "mode": "message_only",
+        "last_received_header": "{% assign last_received_header = .read_email.body.payload.headers | where:\"name\",\"Received\" %}{{last_received_header.last | as_object}}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "explode ips",
+      "disabled": false,
+      "guid": "6fd164d11427d9a8c15ad09da03676fb",
+      "options": {
+        "mode": "explode",
+        "path": "{{.extract_ips_from_received_headers.ips }}",
+        "to": "ip",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get individual Attachments",
+      "disabled": false,
+      "guid": "74d53b0e971b84363b0854f0661d51ea",
+      "options": {
+        "url": "https://www.googleapis.com/gmail/v1/users/thomas@tines.io/messages/{{.read_email.body.id}}/attachments/{{.explode_attachments.attachment.body.attachmentId}}",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential google %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "read email",
+      "disabled": false,
+      "guid": "917625e83f1c174e1176218651c774ce",
+      "options": {
+        "url": "https://www.googleapis.com/gmail/v1/users/thomas@tines.io/messages/{{.upload_eml_to_gmail.body.id}}",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {% credential google %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "mark email as read",
+      "disabled": false,
+      "guid": "af3afcfb845b000603185fe70a5e0759",
+      "options": {
+        "url": "https://www.googleapis.com/gmail/v1/users/thomas@tines.io/messages/batchModify",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "ids": [
+            "{{.explode_individual_emails.individual_email.id}}"
+          ],
+          "removeLabelIds": [
+            "UNREAD"
+          ]
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential google %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "trigger if Emotet header",
+      "disabled": false,
+      "guid": "b6fdecb86cce910bcc5dc49b0dcc0c15",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "([0-9]{20}).([0-9a-fA-F]{16})@([0-9a-zA-Z-]+.){3}",
+            "path": "{{.read_email.body.payload.headers | where:\\\"name\\\",\\\"Message-ID\\\" }}"
+          },
+          {
+            "type": "regex",
+            "value": "([0-9A-Fa-f]{2}).([0-9A-Fa-f]{2}).([0-9A-Fa-f]{5}).([0-9A-Fa-f]{8})@([0-9a-zA-Z-]+.){3}",
+            "path": "{{.read_email.body.payload.headers | where:\\\"name\\\",\\\"Message-ID\\\" }}"
+          },
+          {
+            "type": "regex",
+            "value": "([0-9A-Fa-f]{51})@([0-9a-zA-Z-]+.){3}",
+            "path": "{{.read_email.body.payload.headers | where:\\\"name\\\",\\\"Message-ID\\\" }}"
+          }
+        ],
+        "must_match": "1",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "upload eml to gmail",
+      "disabled": false,
+      "guid": "c2d6d1b61749e9362e7677c5aa2fd447",
+      "options": {
+        "url": "https://www.googleapis.com/gmail/v1/users/thomas@tines.io/messages/",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "raw": "{{.get_individual_attachments.body.data}}"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential google %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "extract ips from received headers",
+      "disabled": false,
+      "guid": "c83d9b9817486340c9a48499016319f8",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{.read_email.body.payload.headers | where:\\\"name\\\",\\\"Received\\\" }}",
+            "regexp": "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b",
+            "to": "ips"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "explode individual emails",
+      "disabled": false,
+      "guid": "cb415de0ca79ed11761d9d644a5002ad",
+      "options": {
+        "mode": "explode",
+        "path": "{{.get_email_from_gmail.body.messages}}",
+        "to": "individual_email",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "search IP in Talos Intelligence",
+      "disabled": false,
+      "guid": "dac2185deea94ab421b5b0a90847d660",
+      "options": {
+        "url": "https://talosintelligence.com/sb_api/query_lookup",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "query": "/api/v2/details/ip/",
+          "query_entry": "{{.explode_ips.ip}}"
+        },
+        "headers": {
+          "Referer": "https://talosintelligence.com/reputation_center/lookup?search="
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "read email",
+      "disabled": false,
+      "guid": "f5efc1a256945b2828af268ab09db52d",
+      "options": {
+        "url": "https://www.googleapis.com/gmail/v1/users/thomas@tines.io/messages/{{.explode_individual_emails.individual_email.id}}",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {% credential google %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "check dmarc, dkim and spf",
+      "disabled": false,
+      "guid": "f93b9c04af488a3e46a4294796e4f238",
+      "options": {
+        "mode": "message_only",
+        "dkim": "{% if .read_email.body.payload.headers | where:\"name\",\"Authentication-Results\" contains \"dkim=pass\" %}pass{% elsif .read_email.body.payload.headers | where:\"name\",\"Authentication-Results\" contains \"dkim=fail\" %}fail{% else %}none{% endif %}",
+        "spf": "{% if .read_email.body.payload.headers | where:\"name\",\"Authentication-Results\" contains \"spf=pass\" %}pass{% elsif .read_email.body.payload.headers | where:\"name\",\"Authentication-Results\" contains \"spf=fail\" %}fail{% else %}none{% endif %}",
+        "dmarc": "{% if .read_email.body.payload.headers | where:\"name\",\"Authentication-Results\" contains \"dmarc=pass\" %}pass{% elsif .read_email.body.payload.headers | where:\"name\",\"Authentication-Results\" contains \"dmarc=fail\" %}fail{% else %}none{% endif %}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 13
+    },
+    {
+      "source": 1,
+      "receiver": 10
+    },
+    {
+      "source": 2,
+      "receiver": 12
+    },
+    {
+      "source": 3,
+      "receiver": 6
+    },
+    {
+      "source": 5,
+      "receiver": 0
+    },
+    {
+      "source": 6,
+      "receiver": 1
+    },
+    {
+      "source": 7,
+      "receiver": 8
+    },
+    {
+      "source": 7,
+      "receiver": 3
+    },
+    {
+      "source": 8,
+      "receiver": 9
+    },
+    {
+      "source": 8,
+      "receiver": 15
+    },
+    {
+      "source": 8,
+      "receiver": 4
+    },
+    {
+      "source": 8,
+      "receiver": 11
+    },
+    {
+      "source": 10,
+      "receiver": 7
+    },
+    {
+      "source": 11,
+      "receiver": 5
+    },
+    {
+      "source": 12,
+      "receiver": 14
+    },
+    {
+      "source": 14,
+      "receiver": 8
+    },
+    {
+      "source": 14,
+      "receiver": 3
+    }
+  ],
+  "control_links": [
+
+  ]
+}

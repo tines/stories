@@ -1,0 +1,320 @@
+{
+  "schema_version": 1,
+  "name": "Share Indicators of Compromise",
+  "description": "Tines Story to Share Indicators of Compromise",
+  "guid": "ac0efc75bf5a4ae2a1db4db88d162306",
+  "exported_at": "2019-03-15T16:56:56Z",
+  "agents": [
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Share IOC with RiskIQ Passivetotal",
+      "disabled": false,
+      "guid": "0f62124e09ab102f86cbc9b5f1666c9f",
+      "options": {
+        "url": "https://api.passivetotal.org/v2/artifact",
+        "content_type": "json",
+        "method": "PUT",
+        "payload": {
+          "project": "b1b08421-67e4-f961-e356-a77cfd0b81a4",
+          "query": "{{.extract_domain.domain.first}}",
+          "tags": [
+            "{{.iocs_webhook.ioc_tags}}"
+          ],
+          "type": "domain"
+        },
+        "headers": {
+          "Authorization": "Basic {% credential riskiq %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Share IOC with AlienVault",
+      "disabled": false,
+      "guid": "192cabc2f5a993827fcc76681252151f",
+      "options": {
+        "url": "https://otx.alienvault.com/api/v1/pulses/create/",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "name": "{{.iocs_webhook.ioc_name}}",
+          "public": "true",
+          "indicators": [
+            {
+              "indicator": "{{.iocs_webhook.ioc}}",
+              "type": "{{.iocs_webhook.ioc_type}}",
+              "description": "{{.iocs_webhook.ioc_name}}"
+            }
+          ],
+          "tags": [
+            "{{.iocs_webhook.ioc_tags}}"
+          ]
+        },
+        "headers": {
+          "X-OTX-API-KEY": "{% credential alienvault_tines %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Share IOC with Trustar",
+      "disabled": false,
+      "guid": "2473c48bd451073063564f22e5cf0617",
+      "options": {
+        "url": "https://api.trustar.co/api/1.3/indicators",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "enclaveIds": [
+            "{% credential trustar_enclave_id %}"
+          ],
+          "content": [
+            {
+              "value": "{{.iocs_webhook.ioc}}",
+              "sightings": "1",
+              "source": "internal",
+              "notes": "{{.iocs_webhook.ioc_name}}",
+              "tags": [
+                {
+                  "name": "{{.iocs_webhook.ioc_tags}}",
+                  "enclaveId": "{% credential trustar_enclave_id %}"
+                }
+              ]
+            }
+          ]
+        },
+        "headers": {
+          "Authorization": "Bearer {{.login_to_trustar.body.access_token}}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "RiskIQ Create Project",
+      "disabled": false,
+      "guid": "39616d466f02b759c45ed9e791c1eae8",
+      "options": {
+        "url": "https://api.passivetotal.org/v2/project",
+        "content_type": "json",
+        "method": "PUT",
+        "payload": {
+          "name": "Tines.io Malicious URLs",
+          "visibility": "public",
+          "description": "Tines.io Malicious URLs",
+          "tags": [
+            "phishing"
+          ]
+        },
+        "headers": {
+          "Authorization": "Basic {% credential riskiq %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Share IOC with Virustotal",
+      "disabled": false,
+      "guid": "3d46f1cef83a6a5366da4f6922369c04",
+      "options": {
+        "url": "https://www.virustotal.com/vtapi/v2/url/report",
+        "method": "get",
+        "payload": {
+          "apikey": "{% credential Virustotal %}",
+          "resource": "{{.iocs_webhook.ioc}}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Share IOC with URLScan",
+      "disabled": false,
+      "guid": "59cd39c6d694f556eaf3ced200b5b3fa",
+      "options": {
+        "url": "https://urlscan.io/api/v1/scan/",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "url": "{{.iocs_webhook.ioc}}",
+          "public": "on"
+        },
+        "headers": {
+          "API-Key": "{% credential urlscan_io %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "IOCs Webhook",
+      "disabled": false,
+      "guid": "92a40b3858230dc2d72defeb87008503",
+      "options": {
+        "secret": "e37f8c1bb97c355677ead31157972774",
+        "verbs": "get,post",
+        "expected_update_period_in_days": 1
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EmailAgent",
+      "name": "Share IOC with Phishtank",
+      "disabled": false,
+      "guid": "9521942fa531f42b700e4a88bcee1df0",
+      "options": {
+        "recipients": "phish-tinesio.7c39f@phishtank.com",
+        "subject": "New Phishing URL",
+        "body": "{{.iocs_webhook.ioc}}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Share IOC with Facebook Threat Exchange",
+      "disabled": false,
+      "guid": "9f458c66569328ef78b48500e7484b60",
+      "options": {
+        "url": "https://graph.facebook.com/v2.8/threat_descriptors",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "access_token": "{% credential threatexchange %}",
+          "indicator": "{{.iocs_webhook.ioc}}",
+          "type": "URI",
+          "tags": "{{.iocs_webhook.ioc_tags}}",
+          "status": "MALICIOUS",
+          "privacy_type": "VISIBLE",
+          "description": "{{.iocs_webhook.ioc_name}}",
+          "share_level": "GREEN"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Share IOC with Pastebin",
+      "disabled": false,
+      "guid": "a2f903833994d36732681ec76073c92f",
+      "options": {
+        "url": "https://pastebin.com/api/api_post.php",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "api_dev_key": "{% credential Pastebin %}",
+          "api_option": "paste",
+          "api_paste_code": "Suspicious {{.iocs_webhook.ioc_type}} was detected. {% line_break %}IOC: {{.iocs_webhook.ioc}} {% line_break %}Description {{.iocs_webhook.ioc_name}}. {% line_break %}Tags: {{.iocs_webhook.ioc_tags}}",
+          "api_user_key": "{% credential pastebin_userkey %}",
+          "api_paste_name": "{{.iocs_webhook.ioc_name}}"
+        },
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Extract Domain",
+      "disabled": false,
+      "guid": "df75715ca047715931bb13c5b5b16b60",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{.iocs_webhook.ioc}}",
+            "regexp": "^(?:https?:\\/\\/)?(?:[^@\\n]+@)?(?:www\\.)?([^:\\/\\n?]+)",
+            "to": "domain"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Login to Trustar",
+      "disabled": false,
+      "guid": "ff5dbcf9ec07b0de6343c9dc2c292676",
+      "options": {
+        "url": "https://api.trustar.co/oauth/token",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "grant_type": "client_credentials"
+        },
+        "headers": {
+          "Authorization": "Basic {% credential trustar_tines %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 6,
+      "receiver": 1
+    },
+    {
+      "source": 6,
+      "receiver": 11
+    },
+    {
+      "source": 6,
+      "receiver": 7
+    },
+    {
+      "source": 6,
+      "receiver": 5
+    },
+    {
+      "source": 6,
+      "receiver": 4
+    },
+    {
+      "source": 6,
+      "receiver": 9
+    },
+    {
+      "source": 6,
+      "receiver": 8
+    },
+    {
+      "source": 6,
+      "receiver": 10
+    },
+    {
+      "source": 10,
+      "receiver": 0
+    },
+    {
+      "source": 11,
+      "receiver": 2
+    }
+  ],
+  "control_links": [
+
+  ]
+}

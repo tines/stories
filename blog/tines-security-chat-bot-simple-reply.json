@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "name": "Tines Security Chat Bot - Simple Reply",
+  "description": "A simple webhook and reply flow for the Tines Chat Bot",
+  "guid": "c3f04485610f164c041eb5c011031df7",
+  "exported_at": "2019-07-30T08:51:15Z",
+  "agents": [
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "receive commands",
+      "disabled": false,
+      "guid": "41aa10ac4bede6a21237497f09cc24f5",
+      "options": {
+        "secret": "5ab1b830c3fbe74b8db083b6ba2af863",
+        "verbs": "get,post",
+        "expected_update_period_in_days": 1
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Reply with Results",
+      "disabled": false,
+      "guid": "5ab8bdd9e4129e09a276cb74545018bc",
+      "options": {
+        "url": "{{.receive_commands.serviceUrl}}/v3/conversations/{{.receive_commands.conversation.id}}/activities",
+        "method": "post",
+        "content_type": "json",
+        "payload": {
+          "type": "message",
+          "from": {
+            "id": "{{.receive_commands.recipient.id}}",
+            "name": "{{.receive_commands.recipient.name}}"
+          },
+          "recipient": {
+            "id": "{{.receive_commands.from.id}}",
+            "name": "{{.receive_commands.from.name}}"
+          },
+          "text": "This is the Tines Chat Bot, coming right back at you!"
+        },
+        "headers": {
+          "Authorization": "Bearer {{.get_bearer_token_from_microsoft.body.access_token}}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Bearer Token from Microsoft",
+      "disabled": false,
+      "guid": "83f28df275883cec327d473a94233994",
+      "options": {
+        "url": "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "grant_type": "client_credentials",
+          "client_id": "f7aba91c-d4c8-4034-89b0-f5c1d60c4b39",
+          "client_secret": "{% credential teams_bot %}",
+          "scope": "https://api.botframework.com/.default"
+        },
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 2
+    },
+    {
+      "source": 2,
+      "receiver": 1
+    }
+  ],
+  "control_links": [
+
+  ]
+}

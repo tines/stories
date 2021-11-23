@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "name": "AWS Security Hub",
+  "description": "This story is a companion to the Tines Blog available here: https://tines.io/blog/processing-and-enriching-aws-security-hub-findings/",
+  "guid": "b23f8ef4214eba08bd70c4d56a69569f",
+  "exported_at": "2019-07-05T14:30:22Z",
+  "agents": [
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Parse message",
+      "disabled": false,
+      "guid": "3979da11af6196a6d1f3ddb7eba48dab",
+      "options": {
+        "mode": "message_only",
+        "message": "{{.receive_aws_security_hub_notification.Message | json_parse | as_object }}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Event is security hub notification",
+      "disabled": false,
+      "guid": "3e01931094d3c5b702fad5b8413f3d86",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "Notification",
+            "path": "{{.receive_aws_security_hub_notification.Type}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Event is sns confirmation",
+      "disabled": false,
+      "guid": "6a987ea7c2ace5c96eb49f33e4fca97f",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "SubscriptionConfirmation",
+            "path": "{{.receive_aws_security_hub_notification.Type}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Confirm subscription",
+      "disabled": false,
+      "guid": "9d3a774edbd3930e1d6945219f52e24c",
+      "options": {
+        "url": "{{.receive_aws_security_hub_notification.SubscribeURL}}",
+        "content_type": "json",
+        "method": "get",
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "Receive AWS Security Hub Notification",
+      "disabled": false,
+      "guid": "b593f12ff278183b93572f547f2addc0",
+      "options": {
+        "secret": "de38b6203ae66ed5ec6b76ba419f7f8e",
+        "verbs": "get,post",
+        "expected_update_period_in_days": 1
+      },
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 1,
+      "receiver": 0
+    },
+    {
+      "source": 2,
+      "receiver": 3
+    },
+    {
+      "source": 4,
+      "receiver": 2
+    },
+    {
+      "source": 4,
+      "receiver": 1
+    }
+  ],
+  "control_links": [
+
+  ]
+}

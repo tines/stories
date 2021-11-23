@@ -1,0 +1,294 @@
+{
+  "schema_version": 1,
+  "name": "sts Analyze URL in urlscan",
+  "description": "",
+  "guid": "538f01ea2c8d164dd4d93562b2c5a577",
+  "exported_at": "2019-11-13T19:36:40Z",
+  "agents": [
+    {
+      "type": "Agents::SendToStoryAgent",
+      "name": "Analyze URL",
+      "disabled": false,
+      "guid": "aedbafd24efc866a3a1bb215f659b8d7",
+      "options": {
+        "story": "{% story sts Analyze URL in urlscan %}",
+        "payload": {
+          "url": "https://techcrunch.com"
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "submit url to urlscan",
+      "disabled": false,
+      "guid": "d1120f88d801e1eb04d9bbfc6e170a0f",
+      "options": {
+        "url": "https://urlscan.io/api/v1/scan/",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "url": "{{.receive_events.url}}",
+          "public": "off"
+        },
+        "headers": {
+          "API-Key": "{% credential urlscan_io %}"
+        },
+        "fail_on_status": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "build results",
+      "disabled": false,
+      "guid": "7ee71bf6fbf0d54183d748d3ebd3996a",
+      "options": {
+        "mode": "message_only",
+        "url": "{{.receive_events.url}}",
+        "domain": "{{.extract_domain.domain}}",
+        "urlscan_malicious": "{{.check_urlscan_result.body.verdicts.overall.malicious}}",
+        "urlscan_link": "{{.check_urlscan_result.body.task.reportURL}}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "receive events",
+      "disabled": false,
+      "guid": "ebb76332042758aaa99acf2e7c5336b0",
+      "options": {
+        "secret": "565cecb57afe31d284590ff28d247908",
+        "verbs": "get,post",
+        "expected_update_period_in_days": 1
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "check urlscan result",
+      "disabled": false,
+      "guid": "932cb0a31f1da9f10dbce7e9f69de068",
+      "options": {
+        "url": "https://urlscan.io/api/v1/result/{{.submit_url_to_urlscan.body.uuid}}/",
+        "method": "get",
+        "headers": {
+          "API-Key": "{% credential urlscan_io %}"
+        },
+        "fail_on_status": "true",
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "delay 30 seconds",
+      "disabled": false,
+      "guid": "2b8971cdc6b615a640d6735a13cf627d",
+      "options": {
+        "mode": "delay",
+        "seconds": "30",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "extract domain",
+      "disabled": false,
+      "guid": "1e13dd779fd1ae17b50839b93c78f664",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{.receive_events.url}}",
+            "regexp": "^(?:https?:\\/\\/)?(?:[^@\\n]+@)?(?:www\\.)?([^:\\/\\n?]+)",
+            "to": "domain"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 1,
+      "receiver": 5
+    },
+    {
+      "source": 3,
+      "receiver": 6
+    },
+    {
+      "source": 4,
+      "receiver": 2
+    },
+    {
+      "source": 5,
+      "receiver": 4
+    },
+    {
+      "source": 6,
+      "receiver": 1
+    }
+  ],
+  "control_links": [
+
+  ],
+  "diagram_layout": "{\"ebb76332042758aaa99acf2e7c5336b0\":[345,-540],\"7ee71bf6fbf0d54183d748d3ebd3996a\":[345,-165],\"d1120f88d801e1eb04d9bbfc6e170a0f\":[345,-390],\"2b8971cdc6b615a640d6735a13cf627d\":[345,-315],\"932cb0a31f1da9f10dbce7e9f69de068\":[345,-240],\"1e13dd779fd1ae17b50839b93c78f664\":[345,-465],\"aedbafd24efc866a3a1bb215f659b8d7\":[105,-540]}",
+  "send_to_story_enabled": true,
+  "entry_agent_guid": "ebb76332042758aaa99acf2e7c5336b0",
+  "exit_agent_guid": "7ee71bf6fbf0d54183d748d3ebd3996a",
+  "send_to_stories": [
+    {
+      "schema_version": 1,
+      "name": "sts Analyze URL in urlscan",
+      "description": "",
+      "guid": "538f01ea2c8d164dd4d93562b2c5a577",
+      "exported_at": "2019-11-13T19:36:40Z",
+      "agents": [
+        {
+          "type": "Agents::SendToStoryAgent",
+          "name": "Analyze URL",
+          "disabled": false,
+          "guid": "aedbafd24efc866a3a1bb215f659b8d7",
+          "options": {
+            "story": "{% story sts Analyze URL in urlscan %}",
+            "payload": {
+              "url": "https://techcrunch.com"
+            }
+          },
+          "schedule": "never",
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "submit url to urlscan",
+          "disabled": false,
+          "guid": "d1120f88d801e1eb04d9bbfc6e170a0f",
+          "options": {
+            "url": "https://urlscan.io/api/v1/scan/",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "url": "{{.receive_events.url}}",
+              "public": "off"
+            },
+            "headers": {
+              "API-Key": "{% credential urlscan_io %}"
+            },
+            "fail_on_status": "true"
+          },
+          "schedule": "never",
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "build results",
+          "disabled": false,
+          "guid": "7ee71bf6fbf0d54183d748d3ebd3996a",
+          "options": {
+            "mode": "message_only",
+            "url": "{{.receive_events.url}}",
+            "domain": "{{.extract_domain.domain}}",
+            "urlscan_malicious": "{{.check_urlscan_result.body.verdicts.overall.malicious}}",
+            "urlscan_link": "{{.check_urlscan_result.body.task.reportURL}}"
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::WebhookAgent",
+          "name": "receive events",
+          "disabled": false,
+          "guid": "ebb76332042758aaa99acf2e7c5336b0",
+          "options": {
+            "secret": "565cecb57afe31d284590ff28d247908",
+            "verbs": "get,post",
+            "expected_update_period_in_days": 1
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "check urlscan result",
+          "disabled": false,
+          "guid": "932cb0a31f1da9f10dbce7e9f69de068",
+          "options": {
+            "url": "https://urlscan.io/api/v1/result/{{.submit_url_to_urlscan.body.uuid}}/",
+            "method": "get",
+            "headers": {
+              "API-Key": "{% credential urlscan_io %}"
+            },
+            "fail_on_status": "true",
+            "expected_update_period_in_days": "1"
+          },
+          "schedule": "never",
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "delay 30 seconds",
+          "disabled": false,
+          "guid": "2b8971cdc6b615a640d6735a13cf627d",
+          "options": {
+            "mode": "delay",
+            "seconds": "30",
+            "expected_update_period_in_days": "2"
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "extract domain",
+          "disabled": false,
+          "guid": "1e13dd779fd1ae17b50839b93c78f664",
+          "options": {
+            "mode": "extract",
+            "matchers": [
+              {
+                "path": "{{.receive_events.url}}",
+                "regexp": "^(?:https?:\\/\\/)?(?:[^@\\n]+@)?(?:www\\.)?([^:\\/\\n?]+)",
+                "to": "domain"
+              }
+            ],
+            "expected_update_period_in_days": "2"
+          },
+          "keep_events_for": 604800
+        }
+      ],
+      "links": [
+        {
+          "source": 1,
+          "receiver": 5
+        },
+        {
+          "source": 3,
+          "receiver": 6
+        },
+        {
+          "source": 4,
+          "receiver": 2
+        },
+        {
+          "source": 5,
+          "receiver": 4
+        },
+        {
+          "source": 6,
+          "receiver": 1
+        }
+      ],
+      "control_links": [
+
+      ],
+      "diagram_layout": "{\"ebb76332042758aaa99acf2e7c5336b0\":[345,-540],\"7ee71bf6fbf0d54183d748d3ebd3996a\":[345,-165],\"d1120f88d801e1eb04d9bbfc6e170a0f\":[345,-390],\"2b8971cdc6b615a640d6735a13cf627d\":[345,-315],\"932cb0a31f1da9f10dbce7e9f69de068\":[345,-240],\"1e13dd779fd1ae17b50839b93c78f664\":[345,-465],\"aedbafd24efc866a3a1bb215f659b8d7\":[105,-540]}",
+      "send_to_story_enabled": true,
+      "entry_agent_guid": "ebb76332042758aaa99acf2e7c5336b0",
+      "exit_agent_guid": "7ee71bf6fbf0d54183d748d3ebd3996a"
+    }
+  ]
+}

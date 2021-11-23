@@ -1,0 +1,73 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Template that creates a CloudWatch Event for SecurityHub",
+  "Parameters": {
+    "EventPatternParameter": {
+      "Type": "String",
+      "Description": "Provide a JSON Object that represents the Event Pattern."
+    },
+    "TinesWebhookURL": {
+      "Type": "String",
+      "Description": "Provide the Tines Webhook URL"
+    }
+  },
+  "Resources": {
+    "securityHubCWERule": {
+      "DependsOn": "SecurityHubSNSTopic",
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Description": "SecurityHub Event Rule",
+        "EventPattern": {
+          "Ref": "EventPatternParameter"
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Ref": "SecurityHubSNSTopic"
+            },
+            "Id": "SecurityHubTopic"
+          }
+        ]
+      }
+    },
+    "SecurityHubSNSTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "Subscription": [
+          {
+            "Endpoint": {
+              "Ref": "TinesWebhookURL"
+            },
+            "Protocol": "https"
+          }
+        ],
+        "TopicName": "SHFindingTopic",
+        "DisplayName": "SHFindingTopic"
+      }
+    },
+    "EventTopicPolicy": {
+      "DependsOn": "SecurityHubSNSTopic",
+      "Type": "AWS::SNS::TopicPolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com"
+              },
+              "Action": "sns:Publish",
+              "Resource": "*"
+            }
+          ]
+        },
+        "Topics": [
+          {
+            "Ref": "SecurityHubSNSTopic"
+          }
+        ]
+      }
+    }
+  }
+}
