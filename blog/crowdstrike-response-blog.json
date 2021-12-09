@@ -1,0 +1,338 @@
+{
+  "schema_version": 3,
+  "name": "Crowdstrike Response Blog",
+  "description": "",
+  "guid": "82d3dc7994f17b2ad9065b843cb09f17",
+  "exported_at": "2021-06-01T13:58:32Z",
+  "agents": [
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Detections in CrowdStrike Falcon",
+      "disabled": false,
+      "guid": "897b23dcbf9c4d82c49f20c88770dc07",
+      "options": {
+        "url": "https://api.{{.RESOURCE.crowdstrike_domain}}/detects/queries/detects/v1",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "limit": "10",
+          "sort": "first_behavior|desc",
+          "filter": "status:'new'"
+        },
+        "headers": {
+          "Authorization": "Bearer {{.CREDENTIAL.crowdstrike}}"
+        },
+        "manual_time": "90",
+        "log_error_on_status": []
+      },
+      "schedule": [],
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Detection Details",
+      "disabled": false,
+      "guid": "9d3e3373ee3843fcb053268e6c796b99",
+      "options": {
+        "url": "https://api.{{.RESOURCE.crowdstrike_domain}}/detects/entities/summaries/GET/v1",
+        "content_type": "json",
+        "method": "post",
+        "headers": {
+          "Authorization": "Bearer {{.CREDENTIAL.crowdstrike}}"
+        },
+        "payload": {
+          "ids": "{{.get_detections_in_crowdstrike_falcon.body.resources | as_object}}"
+        },
+        "manual_time": "60",
+        "log_error_on_status": []
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Update Detection to In Progress",
+      "disabled": false,
+      "guid": "cd95e1875726f37a27704d02f798fe2d",
+      "options": {
+        "url": "https://api.{{.RESOURCE.crowdstrike_domain}}/detects/entities/detects/v2",
+        "content_type": "json",
+        "method": "patch",
+        "headers": {
+          "Authorization": "Bearer {{.CREDENTIAL.crowdstrike}}"
+        },
+        "payload": {
+          "ids": "{{.get_detections_in_crowdstrike_falcon.body.resources | as_object}}",
+          "status": "in_progress"
+        },
+        "manual_time": "60",
+        "log_error_on_status": []
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode Individual Detections",
+      "disabled": false,
+      "guid": "acfb38ea38db6771aefa7f6b00e573e8",
+      "options": {
+        "mode": "explode",
+        "path": "{{.get_detection_details.body.resources}}",
+        "to": "individual_detection"
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Create Issue in Jira",
+      "disabled": false,
+      "guid": "8bc22e692a09e7bc58014da8429d7dec",
+      "options": {
+        "url": "https://{{ .RESOURCE.jira_domain }}/rest/api/2/issue",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "fields": {
+            "project": {
+              "key": "DEMO"
+            },
+            "issuetype": {
+              "name": "Task"
+            },
+            "priority": {
+              "name": "Highest"
+            },
+            "description": "h2. Alert Overview:\n\n||*Priority*|{{.explode_individual_detections.individual_detection.max_severity_displayname}} |\n||*Confidence*|{{.explode_individual_detections.individual_detection.max_confidence}} |\n||*Hostname*|{{.explode_individual_detections.individual_detection.device.hostname}} |\n||*OS*|{{.explode_individual_detections.individual_detection.device.platform_name}} |\n||*Device Type*|{{.explode_individual_detections.individual_detection.device.product_type_desc}} |\n||*Local Time*|{{.explode_individual_detections.individual_detection.device.agent_local_time}} |\n||*External IP*|{{.explode_individual_detections.individual_detection.device.external_ip}} |\n||*Internal IP*|{{.explode_individual_detections.individual_detection.device.local_ip}} |\n||*Host ID*|https://falcon.us-2.crowdstrike.com/hosts/hosts/host/{{.explode_individual_detections.individual_detection.device.device_id}} |\n\n[Click Here to contain this device in Crowdstrike|{% prompt contain %}]\n",
+            "summary": "New Crowdstrike Alert for {{.explode_individual_detections.individual_detection.device.hostname }}"
+          }
+        },
+        "basic_auth": [
+          "{{ .RESOURCE.jira_username }}",
+          "{{ .CREDENTIAL.jira_password}}"
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode Behaviours",
+      "disabled": false,
+      "guid": "693fb9394d6eb6c994151eff20d2cb46",
+      "options": {
+        "mode": "explode",
+        "path": "{{.explode_individual_detections.individual_detection.behaviors }}",
+        "to": "individual_behaviour"
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Search Hash in VirusTotal",
+      "disabled": false,
+      "guid": "280ee3d354a6ce8491a0c87c8e02998e",
+      "options": {
+        "url": "https://www.virustotal.com/api/v3/files/{{.explode_behaviours.individual_behaviour.sha256 }}",
+        "content_type": "json",
+        "method": "get",
+        "payload": {},
+        "headers": {
+          "x-apikey": "{{.CREDENTIAL.virustotal}}"
+        },
+        "retry_on_status": [
+          "429"
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Add Behaviour to Jira",
+      "disabled": false,
+      "guid": "f0ae2d371b90b3c92db6893b262820f9",
+      "options": {
+        "url": "https://{{ .RESOURCE.jira_domain }}/rest/api/2/issue/{{.create_issue_in_jira.body.key }}/comment/",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "body": "\n||*Process Name*|[{{.explode_behaviours.individual_behaviour.filename}}|https://falcon.{{.RESOURCE.crowdstrike_domain}}/activity/detections/detail/{{behavior.control_graph_id | replace: 'ctg:', '' | replace: ':', '/'}}] |\n||*Process Hash*|{{.explode_behaviours.individual_behaviour.sha256}} |\n||*User*|{{.explode_behaviours.individual_behaviour.user_name}} |\n||*Command Line*|{{.explode_behaviours.individual_behaviour.cmdline}} |\n||*IOC Value*|{{.explode_behaviours.individual_behaviour.ioc_value | default: 'N/A'}} |\n||*IOC Source*|{{.explode_behaviours.individual_behaviour.ioc_source | default: 'N/A'}} |\n||*IOC Description*|{{.explode_behaviours.individual_behaviour.ioc_description | default: 'N/A'}} |\n||*VirusTotal Results*|[Identified as malicious or suspicious by {{.search_hash_in_virustotal.body.data.attributes.last_analysis_stats.malicious | plus: .search_hash_in_virustotal.body.data.attributes.last_analysis_stats.suspicious }} engines|https://virustotal.com/gui/file/{{.explode_behaviours.individual_behaviour.sha256}}] |\n||*VirusTotal Label*|{{.search_hash_in_virustotal.body.data.attributes.popular_threat_classification.suggested_threat_label | default: 'None Specified' }} |\n\n||*Parent Hash*|{{.explode_behaviours.individual_behaviour.parent_details.parent_sha256 }} |\n||*Parent Cmdline*|{{.explode_behaviours.individual_behaviour.parent_details.parent_cmdline }} |\n||*VirusTotal Results*|[Identified as malicious or suspicious by {{.search_parent_hash_in_virustotal.body.data.attributes.last_analysis_stats.malicious | plus: .search_parent_hash_in_virustotal.body.data.attributes.last_analysis_stats.suspicious }} engines|https://virustotal.com/gui/file/{{.explode_behaviours.individual_behaviour.parent_details.parent_sha256}}] |\n||*VirusTotal Label*|{{.search_parent_hash_in_virustotal.body.data.attributes.popular_threat_classification.suggested_threat_label | default: 'None Specified' }} |\n\n"
+        },
+        "basic_auth": [
+          "{{ .RESOURCE.jira_username }}",
+          "{{ .CREDENTIAL.jira_password}}"
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Catch Prompt Response",
+      "disabled": false,
+      "guid": "f4ce56e71ed2f2dd2ba50be7fa823c7b",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "contain",
+            "path": "{{.create_issue_in_jira.prompt.status }}"
+          }
+        ]
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Contain Device in Falcon",
+      "disabled": false,
+      "guid": "277f91d60f4e41f7b3a155abe2db278a",
+      "options": {
+        "url": "https://api.{{.RESOURCE.crowdstrike_domain}}/devices/entities/devices-actions/v2?action_name=contain",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "action_parameters": [
+            {
+              "name": "",
+              "value": ""
+            }
+          ],
+          "ids": [
+            "{{.explode_individual_detections.individual_detection.device.device_id }}"
+          ]
+        },
+        "headers": {
+          "Authorization": "Bearer {{.CREDENTIAL.crowdstrike}}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Search Parent Hash in VirusTotal",
+      "disabled": false,
+      "guid": "69e4cdc26f3f4ad1d7a867e3a10c195f",
+      "options": {
+        "url": "https://www.virustotal.com/api/v3/files/{{.explode_behaviours.individual_behaviour.parent_details.parent_sha256 }}",
+        "content_type": "json",
+        "method": "get",
+        "payload": {},
+        "headers": {
+          "x-apikey": "{{.CREDENTIAL.virustotal}}"
+        },
+        "retry_on_status": [
+          "429"
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Handle Behaviours",
+      "disabled": false,
+      "guid": "1f1e6449d2b039e05f8d1cedc0e84e78",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "^$",
+            "path": "{{.create_issue_in_jira.prompt.status }}"
+          }
+        ]
+      },
+      "keep_events_for": 0
+    }
+  ],
+  "diagram_notes": [
+    {
+      "content": "# Enrich and Record\n\nTines enables teams to bring their own tools and combine them in powerful ways. To utilize **VirusTotal** and **Jira** in this story, Credentials and Resources need to be created in Tines.\n\nCreate a Credential in Tines named `Virustotal` with the type Text which will contain your VirusTotal API key. If you do not have a VirusTotal API key, you can sign up for one [here](https://www.virustotal.com/gui/join-us).\n\nTo use Jira as a ticketing platform, create Resources named `Jira URL` which contains the URL of your Jira instance and `Jira Username` which is the user that will be connecting to the Jira REST API. Also create a Credential named `Jira Password` which will contain your Jira user's API key. In the action \"Create Issue in Jira\", make sure to configure the Jira \"Project\" your issue should be created in.",
+      "position": [
+        855.0,
+        570.0
+      ],
+      "guid": "c773006028655182dc1d25b56106865f"
+    },
+    {
+      "content": "# Respond Immediately from Anywhere\n\nUtilizing [Tines Prompts](https://docs.tines.io/tines_actions_widgets#prompt-widget), any incident response action is only a URL click away. In this example, each detection ticket includes a link with the capability to isolate a host and contain any malicious activity in an instant. ",
+      "position": [
+        -15.0,
+        540.0
+      ],
+      "guid": "375c1a679ba1164e1c421b7eaf410190"
+    },
+    {
+      "content": "#  Get New Detections in CrowdStrike\n\nThis story kicks off by using an HTTP Request to CrowdStrike to pull in \"new\" detections. This action can configured to run on a schedule to check for alerts on a regular interval. Once detections are pulled in, their status can be updated to \"In Progress\" automatically to signify they have been acknowledged and triage has begun.",
+      "position": [
+        270.0,
+        210.0
+      ],
+      "guid": "cd58f7d5eb61f9ff560b120e1ef3bafc"
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 2
+    },
+    {
+      "source": 0,
+      "receiver": 1
+    },
+    {
+      "source": 1,
+      "receiver": 3
+    },
+    {
+      "source": 3,
+      "receiver": 4
+    },
+    {
+      "source": 4,
+      "receiver": 8
+    },
+    {
+      "source": 4,
+      "receiver": 11
+    },
+    {
+      "source": 5,
+      "receiver": 6
+    },
+    {
+      "source": 6,
+      "receiver": 10
+    },
+    {
+      "source": 8,
+      "receiver": 9
+    },
+    {
+      "source": 10,
+      "receiver": 7
+    },
+    {
+      "source": 11,
+      "receiver": 5
+    }
+  ],
+  "diagram_layout": "{\"897b23dcbf9c4d82c49f20c88770dc07\":[570.0,210.0],\"9d3e3373ee3843fcb053268e6c796b99\":[570.0,300.0],\"cd95e1875726f37a27704d02f798fe2d\":[825.0,300.0],\"acfb38ea38db6771aefa7f6b00e573e8\":[570.0,375.0],\"8bc22e692a09e7bc58014da8429d7dec\":[570.0,465.0],\"693fb9394d6eb6c994151eff20d2cb46\":[570.0,615.0],\"280ee3d354a6ce8491a0c87c8e02998e\":[570.0,690.0],\"f0ae2d371b90b3c92db6893b262820f9\":[570.0,870.0],\"f4ce56e71ed2f2dd2ba50be7fa823c7b\":[285.0,540.0],\"277f91d60f4e41f7b3a155abe2db278a\":[285.0,630.0],\"69e4cdc26f3f4ad1d7a867e3a10c195f\":[570.0,780.0],\"1f1e6449d2b039e05f8d1cedc0e84e78\":[570.0,540.0]}",
+  "send_to_story_enabled": false,
+  "entry_agent_guid": null,
+  "exit_agent_guids": [],
+  "exit_agent_guid": null,
+  "send_to_stories": [],
+  "form": {
+    "name": "Crowdstrike Response Blog Form",
+    "description": "",
+    "fields": [],
+    "visibility": "tenant",
+    "agent_guid": null,
+    "success_message": "Thank you for your submission"
+  }
+}
