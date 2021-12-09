@@ -1,0 +1,566 @@
+{
+  "schema_version": 1,
+  "name": "Datadog_Investigate_Public",
+  "description": "",
+  "guid": "67dd524e55cb222d3c1f7831a937ca76",
+  "exported_at": "2020-06-08T08:04:21Z",
+  "agents": [
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Emit IPv6",
+      "disabled": false,
+      "guid": "0828aae3a2898382892cfeb04298f223",
+      "options": {
+        "rules": [
+          {
+            "path": "{{ .aggregate_ips.ips }}",
+            "value": "(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))",
+            "type": "regex"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Emit IPv6 Address",
+      "disabled": false,
+      "guid": "b203ec9479a42a93745b7808a3865ed2",
+      "options": {
+        "rules": [
+          {
+            "path": "{{.explode_dd_security_events.dd_input_security_events.title}}",
+            "value": "(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))",
+            "type": "regex"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Extract Tactic",
+      "disabled": false,
+      "guid": "c5e561a639209d2a46ef7e946a111771",
+      "options": {
+        "mode": "message_only",
+        "tactic": "{% for tag in explode_dd_security_events.dd_input_security_events.tags %}\n  {% if tag contains \"tactic:\" %}\n    {{ tag | split: ':' | last | split: \"-\" | first | upcase }}\n  {% endif %}\n{% endfor %}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "IP Type",
+      "disabled": false,
+      "guid": "39980bd051129972a89ed1165c15caaa",
+      "options": {
+        "mode": "message_only",
+        "type": "ipv6"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Emit Low Confidence",
+      "disabled": false,
+      "guid": "d744b529eda2802dd95b2d571470f511",
+      "options": {
+        "rules": [
+          {
+            "path": "{{ .lookup_ip_in_abuseipdb.body.data.abuseConfidenceScore }}",
+            "value": "20",
+            "type": "field<=value"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Extract IP",
+      "disabled": false,
+      "guid": "0289b3688b304a6e2963f3edde8054cd",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{.explode_dd_security_events.dd_input_security_events.title}}",
+            "regexp": "(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))",
+            "to": "ip"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Found Detections On Host",
+      "disabled": false,
+      "guid": "86a814eb5b02dbe9881d127e07e42ee7",
+      "options": {
+        "rules": [
+          {
+            "type": "field>value",
+            "value": "0",
+            "path": "{{ .search_cs_detections_by_ip.body.resources.size }}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Dedup Detections",
+      "disabled": false,
+      "guid": "e43b9b4e49a2e453658f1035ce8e314e",
+      "options": {
+        "mode": "deduplicate",
+        "lookback": "1000",
+        "path": "{{.explode_detections.cs_detections}}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode DD Security Events",
+      "disabled": false,
+      "guid": "220ef2667bc949efec330aeb047a1a0a",
+      "options": {
+        "mode": "explode",
+        "path": "{{ .dd_get_security_events.body.events }}",
+        "to": "dd_input_security_events"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Emit High Severity Detections",
+      "disabled": false,
+      "guid": "dfd537d40d641bdc3c0ca3f4e4855bb5",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "high",
+            "path": "{{ .get_cs_detection_details.body.resources.first.max_severity_displayname }}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "DD Get Security Events",
+      "disabled": false,
+      "guid": "dc559b632c2e8e4639e735f24887db49",
+      "options": {
+        "url": "https://{% global_resource datadoghq %}/api/v1/events",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "start": "{{ 'now' | date: '%s'| minus: 18000 }}",
+          "end": "{{ 'now' | date: '%s' }}",
+          "unaggregated": "true",
+          "sources": "Security Monitoring",
+          "tags": "security:attack"
+        },
+        "headers": {
+          "DD-API-KEY": "{% credential datadog-api-key %}",
+          "DD-APPLICATION-KEY": "{% credential datadog-application-key %}"
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Aggregate IPs",
+      "disabled": false,
+      "guid": "33cb38d1bef75499f7728e0eeaa599ed",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{.explode_dd_security_events.dd_input_security_events.title}}",
+            "regexp": "\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b",
+            "to": "ips"
+          },
+          {
+            "path": "{{.explode_dd_security_events.dd_input_security_events.title}}",
+            "regexp": "(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))",
+            "to": "ips"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Extract IP",
+      "disabled": false,
+      "guid": "a8b21bb39dccde97d5b94db6ee6e7413",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{ .explode_dd_security_events.dd_input_security_events.title}}",
+            "regexp": "\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b",
+            "to": "ip"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Throttle For Next API Call",
+      "disabled": false,
+      "guid": "019f5476a93b68a6b1a26f5cf33e3565",
+      "options": {
+        "mode": "delay",
+        "seconds": "{{.explode_detections.index | times: 0.5 }}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Extract Technique",
+      "disabled": false,
+      "guid": "c9f637cce2792e26319075d38bb771fd",
+      "options": {
+        "mode": "message_only",
+        "technique": "{% for tag in explode_dd_security_events.dd_input_security_events.tags %}\n  {% if tag contains \"technique:\" %}\n    {{ tag | split: ':' | last | split: \"-\" | first | upcase }}\n  {% endif %}\n{% endfor %}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Emit High Confidence",
+      "disabled": false,
+      "guid": "3869dae4f1bcca805b3058a269ebf9e5",
+      "options": {
+        "rules": [
+          {
+            "path": "{{ .lookup_ip_abuseipdb.body.data.abuseConfidenceScore }}",
+            "value": "20",
+            "type": "field>value"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Throtlle For Next API Call",
+      "disabled": false,
+      "guid": "792641d5366da4689dade2568744233c",
+      "options": {
+        "mode": "delay",
+        "seconds": " {{ .explode_dd_security_events.index | times: 3 }}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Emit IPv4",
+      "disabled": false,
+      "guid": "699a107e91738289233b015f5a54138d",
+      "options": {
+        "rules": [
+          {
+            "path": "{{ .aggregate_ips.ips }}",
+            "value": "\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b",
+            "type": "regex"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Dedup Security Events",
+      "disabled": false,
+      "guid": "8e29540578cb9b24d64082121d9bbd2c",
+      "options": {
+        "mode": "deduplicate",
+        "lookback": "1000",
+        "path": "{{ .explode_dd_security_events.dd_input_security_events.id }}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Dedup IPs Per Run",
+      "disabled": false,
+      "guid": "5d8cead1d692a10f554b626488d37d77",
+      "options": {
+        "mode": "deduplicate",
+        "lookback": "100",
+        "path": "{{ .aggregate_ips.ips }}{% story_run_guid %}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Emit IPv4 Address",
+      "disabled": false,
+      "guid": "8c52892fe167df605354bb351d5eb012",
+      "options": {
+        "rules": [
+          {
+            "path": "{{.explode_dd_security_events.dd_input_security_events.title}}",
+            "value": "\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b",
+            "type": "regex"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "IP Type",
+      "disabled": false,
+      "guid": "1ed5b38a0c81d1f4417d2b700e9d97ba",
+      "options": {
+        "mode": "message_only",
+        "type": "ipv4"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode Detections",
+      "disabled": false,
+      "guid": "3ecd666d90b57050cb5e1bc59ecfd218",
+      "options": {
+        "mode": "explode",
+        "path": "{{.search_cs_detections_by_ip.body.resources}}",
+        "to": "cs_detections"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Lookup IP IN AbuseIPDB",
+      "disabled": false,
+      "guid": "9c211451a02efac531981d450b12fdee",
+      "options": {
+        "url": "https://{% global_resource abuseipdb %}/api/v2/check",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "maxAgeInDays": "90",
+          "ipAddress": "{{.extract_ip.ip }}",
+          "verbose": "true"
+        },
+        "headers": {
+          "key": "{% credential abuseipdb %}"
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Search CS Detections By IP",
+      "disabled": false,
+      "guid": "fba02890a52778a80147ba5229f9c652",
+      "options": {
+        "url": "https://{% global_resource crowdstrike %}/detects/queries/detects/v1",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "filter": "device.external_ip:'{{ .aggregate_ips.ips }}',device.local_ip: '{{ .aggregate_ips.ips }}'"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential crowdstrike %}"
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::SendToStoryAgent",
+      "name": "Send to PagerDuty",
+      "disabled": false,
+      "guid": "8f86d001a156ddc767b107f10b8f9868",
+      "options": {
+        "story": "{% story pagerduty-sub-story %}",
+        "payload": {
+          "key": "value",
+          "something": "the event contained {{ .somekey }}"
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::SendToStoryAgent",
+      "name": "Contact, Contain, and Create Ticket",
+      "disabled": false,
+      "guid": "ed6b6c9f7c397441e207d0e69c047a55",
+      "options": {
+        "story": "{% story contain-sub-story %}",
+        "payload": {
+          "key": "{{ . }}",
+          "something": "the event contained {{ .somekey }}"
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get CS Detection Details",
+      "disabled": false,
+      "guid": "6e0196657eceb26778620bf836577b1f",
+      "options": {
+        "url": "https://{% global_resource crowdstrike %}/detects/entities/summaries/GET/v1",
+        "content_type": "json",
+        "method": "post",
+        "headers": {
+          "Authorization": "Bearer {% credential crowdstrike %}"
+        },
+        "payload": {
+          "ids": [
+            "{{.explode_detections.cs_detections}}"
+          ]
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 3
+    },
+    {
+      "source": 1,
+      "receiver": 5
+    },
+    {
+      "source": 2,
+      "receiver": 14
+    },
+    {
+      "source": 3,
+      "receiver": 24
+    },
+    {
+      "source": 4,
+      "receiver": 11
+    },
+    {
+      "source": 5,
+      "receiver": 16
+    },
+    {
+      "source": 6,
+      "receiver": 22
+    },
+    {
+      "source": 7,
+      "receiver": 13
+    },
+    {
+      "source": 8,
+      "receiver": 18
+    },
+    {
+      "source": 9,
+      "receiver": 26
+    },
+    {
+      "source": 10,
+      "receiver": 8
+    },
+    {
+      "source": 11,
+      "receiver": 19
+    },
+    {
+      "source": 12,
+      "receiver": 16
+    },
+    {
+      "source": 13,
+      "receiver": 27
+    },
+    {
+      "source": 14,
+      "receiver": 20
+    },
+    {
+      "source": 14,
+      "receiver": 1
+    },
+    {
+      "source": 15,
+      "receiver": 11
+    },
+    {
+      "source": 15,
+      "receiver": 25
+    },
+    {
+      "source": 16,
+      "receiver": 23
+    },
+    {
+      "source": 17,
+      "receiver": 21
+    },
+    {
+      "source": 18,
+      "receiver": 2
+    },
+    {
+      "source": 19,
+      "receiver": 17
+    },
+    {
+      "source": 19,
+      "receiver": 0
+    },
+    {
+      "source": 20,
+      "receiver": 12
+    },
+    {
+      "source": 21,
+      "receiver": 24
+    },
+    {
+      "source": 22,
+      "receiver": 7
+    },
+    {
+      "source": 23,
+      "receiver": 15
+    },
+    {
+      "source": 23,
+      "receiver": 4
+    },
+    {
+      "source": 24,
+      "receiver": 6
+    },
+    {
+      "source": 27,
+      "receiver": 9
+    }
+  ],
+  "control_links": [
+
+  ],
+  "diagram_layout": "{\"dc559b632c2e8e4639e735f24887db49\":[-780,-315],\"8e29540578cb9b24d64082121d9bbd2c\":[-780,-165],\"220ef2667bc949efec330aeb047a1a0a\":[-780,-240],\"c5e561a639209d2a46ef7e946a111771\":[-780,-75],\"c9f637cce2792e26319075d38bb771fd\":[-780,-15],\"a8b21bb39dccde97d5b94db6ee6e7413\":[-915,165],\"0289b3688b304a6e2963f3edde8054cd\":[-660,165],\"9c211451a02efac531981d450b12fdee\":[-780,360],\"8c52892fe167df605354bb351d5eb012\":[-915,90],\"b203ec9479a42a93745b7808a3865ed2\":[-660,90],\"d744b529eda2802dd95b2d571470f511\":[-660,450],\"3869dae4f1bcca805b3058a269ebf9e5\":[-915,450],\"fba02890a52778a80147ba5229f9c652\":[-585,915],\"792641d5366da4689dade2568744233c\":[-780,270],\"33cb38d1bef75499f7728e0eeaa599ed\":[-585,570],\"5d8cead1d692a10f554b626488d37d77\":[-585,645],\"699a107e91738289233b015f5a54138d\":[-705,735],\"1ed5b38a0c81d1f4417d2b700e9d97ba\":[-705,810],\"0828aae3a2898382892cfeb04298f223\":[-495,735],\"39980bd051129972a89ed1165c15caaa\":[-495,810],\"86a814eb5b02dbe9881d127e07e42ee7\":[-585,1005],\"3ecd666d90b57050cb5e1bc59ecfd218\":[-585,1095],\"e43b9b4e49a2e453658f1035ce8e314e\":[-585,1170],\"6e0196657eceb26778620bf836577b1f\":[-585,1335],\"019f5476a93b68a6b1a26f5cf33e3565\":[-585,1245],\"dfd537d40d641bdc3c0ca3f4e4855bb5\":[-585,1425],\"ed6b6c9f7c397441e207d0e69c047a55\":[-585,1515],\"8f86d001a156ddc767b107f10b8f9868\":[-1020,570]}",
+  "send_to_story_enabled": null,
+  "entry_agent_guid": null,
+  "exit_agent_guid": null,
+  "send_to_stories": [
+
+  ]
+}
