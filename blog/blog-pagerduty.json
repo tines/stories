@@ -1,0 +1,1393 @@
+{
+  "schema_version": 1,
+  "name": "Scrub BLOG Pagerduty",
+  "description": null,
+  "guid": "440019cfae0662d053b6e0c27873a73e",
+  "exported_at": "2020-07-02T15:36:48Z",
+  "agents": [
+    {
+      "type": "Agents::SendToStoryAgent",
+      "name": "Pivot Through PagerDuty",
+      "disabled": false,
+      "guid": "b257944c9e95a9b16dd4629b6ff5137b",
+      "options": {
+        "story": "{% story STS PagerDuty %}",
+        "payload": {
+          "hostname": "{{ .initiate_crowdstrike_executive_laptop_checks.hostname}}",
+          "user_name": "{{ .initiate_crowdstrike_executive_laptop_checks.user_name}}",
+          "detection_id": "{{ .explode_detection_details.detection_id_details.detection_id}}",
+          "bios_manufacturer": "{{ .initiate_crowdstrike_executive_laptop_checks.bios_manufacturer}}",
+          "bios_version": "{{ .initiate_crowdstrike_executive_laptop_checks.bios_version}}",
+          "external_ip": "{{ .initiate_crowdstrike_executive_laptop_checks.external_ip}}",
+          "local_ip": "{{ .initiate_crowdstrike_executive_laptop_checks.local_ip}}",
+          "mac_address": "{{ .initiate_crowdstrike_executive_laptop_checks.mac_address}}",
+          "device_id": "{{ .initiate_crowdstrike_executive_laptop_checks.device_id}}",
+          "system_manufacturer": "{{ .initiate_crowdstrike_executive_laptop_checks.system_manufacturer}}",
+          "platform_name": "{{ .initiate_crowdstrike_executive_laptop_checks.platform_name}}",
+          "product_type_desc": "{{ .initiate_crowdstrike_executive_laptop_checks.product_type_desc}}",
+          "system_product_name": "{{ .initiate_crowdstrike_executive_laptop_checks.system_product_name}}",
+          "os_version": "{{ .initiate_crowdstrike_executive_laptop_checks.os_version}}",
+          "tactic": "{{ .initiate_crowdstrike_executive_laptop_checks.tactic}}",
+          "technique": "{{ .initiate_crowdstrike_executive_laptop_checks.technique}}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "If Containment Requested",
+      "disabled": false,
+      "guid": "d272c5393614cb866807b6e8ed464e4e",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "true",
+            "path": "{{ .pivot_through_pagerduty.contain }}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "If Results Found",
+      "disabled": false,
+      "guid": "a39d1fe27ee8a067900ff8b76b6a1181",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": ".",
+            "path": "{{ .initiate_crowdstrike_executive_laptop_checks.hostname }}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::SendToStoryAgent",
+      "name": "Initiate CrowdStrike Executive Laptop Checks",
+      "disabled": false,
+      "guid": "a63bd5a5fafab1b3aa27d51cde356d11",
+      "options": {
+        "story": "{% story STS CrowdStrike Search %}",
+        "payload": {
+          "groupname": "{{ groupname }}",
+          "severity": "70"
+        }
+      },
+      "schedule": [
+        {
+          "cron": "*/30 * * * *",
+          "timezone": "Europe/Dublin"
+        }
+      ],
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::SendToStoryAgent",
+      "name": "Initiate Incident Response and Containment",
+      "disabled": false,
+      "guid": "fa0847c37292d28501a6b390e3d9ee53",
+      "options": {
+        "story": "{% story STS Contain with IR %}",
+        "payload": {
+          "device_id": "{{ .initiate_crowdstrike_executive_laptop_checks.device_id }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 1
+    },
+    {
+      "source": 1,
+      "receiver": 4
+    },
+    {
+      "source": 2,
+      "receiver": 0
+    },
+    {
+      "source": 3,
+      "receiver": 2
+    }
+  ],
+  "control_links": [
+
+  ],
+  "diagram_layout": "{\"a63bd5a5fafab1b3aa27d51cde356d11\":[-465,-15],\"b257944c9e95a9b16dd4629b6ff5137b\":[-465,165],\"fa0847c37292d28501a6b390e3d9ee53\":[-465,345],\"a39d1fe27ee8a067900ff8b76b6a1181\":[-465,105],\"d272c5393614cb866807b6e8ed464e4e\":[-465,270]}",
+  "send_to_story_enabled": null,
+  "entry_agent_guid": null,
+  "exit_agent_guid": null,
+  "send_to_stories": [
+    {
+      "schema_version": 1,
+      "name": "STS PagerDuty",
+      "description": "Events API Reference: https://developer.pagerduty.com/docs/events-api-v2/trigger-events/",
+      "guid": "21f5b394dd2adcc5b5c0108453602406",
+      "exported_at": "2020-07-02T15:36:48Z",
+      "agents": [
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Delay 20",
+          "disabled": false,
+          "guid": "7b7050ce3774b4a843fed1b62f1657fa",
+          "options": {
+            "mode": "delay",
+            "seconds": "20"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "List notes for Incident in PagerDuty",
+          "disabled": false,
+          "guid": "ab5caade7b994c03a130aacd59b83e9e",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents/{{.create_an_incident_in_pagerduty.body.incident.id}}/notes",
+            "content_type": "json",
+            "method": "get",
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Snooze an Incident in PagerDuty",
+          "disabled": false,
+          "guid": "268a9f89dede62cf6da4e8a4762812a6",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents/{{.create_an_incident_in_pagerduty.body.incident.id}}/snooze",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "duration": 60
+            },
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "From": "{% global_resource pagerdutyemail %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "List Incidents in PagerDuty",
+          "disabled": false,
+          "guid": "1b27a9a56f0ced9ae4d31de157aaf6a9",
+          "options": {
+            "url": "https://api.pagerduty.com/incidents/",
+            "content_type": "json",
+            "method": "get",
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            },
+            "payload": {
+              "statuses": [
+                "triggered"
+              ]
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Get an Incident in PagerDuty",
+          "disabled": false,
+          "guid": "e6022853fd187f5c1b22c46e549d8481",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents/{{.create_an_incident_in_pagerduty.body.incident.id }}",
+            "content_type": "json",
+            "method": "get",
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "List notes for Incident in PagerDuty",
+          "disabled": false,
+          "guid": "f44e36654435f6a699688f3b1f31ced1",
+          "options": {
+            "url": "https://api.pagerduty.com/incidents/{{.create_an_incident_in_pagerduty.body.incident.id }}/notes",
+            "content_type": "json",
+            "method": "get",
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "List alerts for Incident in PagerDuty",
+          "disabled": false,
+          "guid": "a6ab9d4155ad6d85337aa7e6cd42de38",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}incidents/{{.create_an_incident_in_pagerduty.body.incident.id }}/alerts",
+            "content_type": "json",
+            "method": "get",
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Create a Status Update for an Incident in PagerDuty",
+          "disabled": false,
+          "guid": "27e614e3d45e24a68358de1f6271f349",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents/{{ .create_an_incident_in_pagerduty.body.incident.id }}/status_update",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "message": "The server fire is spreading."
+            },
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "From": "{% global_resource pagerdutyemail %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Delay 20",
+          "disabled": false,
+          "guid": "537d4529c815b9ce4ef70a11504cffe2",
+          "options": {
+            "mode": "delay",
+            "seconds": "20"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Debug",
+          "disabled": false,
+          "guid": "3e28857e6399e0b38b9dd43330d79904",
+          "options": {
+            "mode": "message_only",
+            "global_resource_pagerduty": "{% global_resource pagerduty %}",
+            "Authorization": "Token token={% credential pagerduty %}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::SendToStoryAgent",
+          "name": "Send to PagerDuty Story",
+          "disabled": false,
+          "guid": "5285bc657bf48b2870b7b6f6e1b28fe0",
+          "options": {
+            "story": "{% story STS PagerDuty %}",
+            "payload": {
+              "title": "Insider Threat Detected"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Create an Incident in PagerDuty",
+          "disabled": false,
+          "guid": "24e4029f6c20cc4a787aebb027dbc926",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "incident": {
+                "type": "incident",
+                "title": "Example Title",
+                "service": {
+                  "id": "{% global_resource pagerdutyserviceid %}",
+                  "type": "service_reference"
+                },
+                "urgency": "high",
+                "body": {
+                  "details": "Incident details and description",
+                  "type": "incident_body"
+                },
+                "escalation_policy": {
+                  "type": "escalation_policy_reference",
+                  "id": "{% global_resource pagerdutyescalationpolicyid %}"
+                }
+              }
+            },
+            "headers": {
+              "Authorization": "Token token={% credential pagerdutyaccountlevel %}",
+              "From": "{% global_resource pagerdutyemail %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Manage an Incident in PagerDuty",
+          "disabled": false,
+          "guid": "0ae97419a61b327bb54da652b6338ce9",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents",
+            "content_type": "json",
+            "method": "put",
+            "payload": {
+              "incidents": [
+                {
+                  "id": "{{.create_an_incident_in_pagerduty.body.incident.id }}",
+                  "type": "incident_reference",
+                  "priority": {
+                    "id": "{{.list_priorities_in_pagerduty.body.priorities.first.id }}",
+                    "type": "priority_reference"
+                  },
+                  "status": "acknowledged",
+                  "assignments": [
+                    {
+                      "assignee": {
+                        "id": "{{.list_users_in_pagerduty.body.users.first.id }}",
+                        "type": "user_reference"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "From": "{% credential pagerdutyemail %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Acknowledge an Event in PagerDuty",
+          "disabled": false,
+          "guid": "e4f455ef759a8a7a307abaa6a5a0514e",
+          "options": {
+            "url": "https://{% global_resource pagerdutyevents %}/v2/enqueue",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "routing_key": "{% credential pagerdutyroutingkey %}",
+              "dedup_key": "{{ .trigger_an_event_in_pagerduty.body.dedup_key }}",
+              "event_action": "acknowledge"
+            },
+            "headers": {
+
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Delay 20",
+          "disabled": false,
+          "guid": "00a5d2f7dc19849e140d0aca5a78ad35",
+          "options": {
+            "mode": "delay",
+            "seconds": "20"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Delay",
+          "disabled": false,
+          "guid": "55e7768efeaa418fc9267309a4715ebd",
+          "options": {
+            "mode": "delay",
+            "seconds": "20"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Resolve an Event in PagerDuty",
+          "disabled": false,
+          "guid": "d6a15d7bf0c448ce76bfba3e0180d1c2",
+          "options": {
+            "url": "https://{% global_resource pagerdutyevents %}/v2/enqueue",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "routing_key": "{% credential pagerdutyroutingkey %}",
+              "dedup_key": "{{ .trigger_an_event_in_pagerduty.body.dedup_key }}",
+              "event_action": "resolve"
+            },
+            "headers": {
+
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Delay",
+          "disabled": false,
+          "guid": "462465870c352aefc6dcd119b88d394c",
+          "options": {
+            "mode": "delay",
+            "seconds": "20"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "List Users in PagerDuty",
+          "disabled": false,
+          "guid": "24d778c71c984b65945b3d44ea3e0d5a",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/users",
+            "content_type": "json",
+            "method": "get",
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "List Priorities in PagerDuty",
+          "disabled": false,
+          "guid": "2152b579892458bdaba263fe22694619",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/priorities",
+            "content_type": "json",
+            "method": "get",
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Delay 20",
+          "disabled": false,
+          "guid": "b0fcf019a2d66df3fde1bcbe36e1437e",
+          "options": {
+            "mode": "delay",
+            "seconds": "20"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Event Transform Agent",
+          "disabled": false,
+          "guid": "47c298d837deb54de170d87926ffae15",
+          "options": {
+            "mode": "message_only",
+            "priority": "{{.list_priorities_in_pagerduty.body.priorities.first.id }}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Create a Status for Action Initiated PagerDuty",
+          "disabled": false,
+          "guid": "7bd4a120a73e5cb9795b94332c02933c",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents/{{ .create_an_incident_in_pagerduty.body.incident.id }}/status_updates",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "message": "Automatic host containment initiated. Incident Response playbook running. Updates to follow. Downgrade priority advised."
+            },
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "From": "{% global_resource pagerdutyemail %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Set Priority of an Incident in PagerDuty",
+          "disabled": false,
+          "guid": "f24b297b3cb0b6997448b0c36570b257",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents",
+            "content_type": "json",
+            "method": "put",
+            "payload": {
+              "incidents": [
+                {
+                  "id": "{{.create_an_incident_in_pagerduty.body.incident.id }}",
+                  "type": "incident_reference",
+                  "priority": {
+                    "id": "{{.list_priorities_in_pagerduty.body.priorities.first.id }}",
+                    "type": "priority_reference"
+                  }
+                }
+              ]
+            },
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "From": "{% credential pagerdutyemail %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Delay 20",
+          "disabled": false,
+          "guid": "12724941fe40761228ce3d3f4f11ef5b",
+          "options": {
+            "mode": "delay",
+            "seconds": "20"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Capture Incident ID",
+          "disabled": false,
+          "guid": "78b93ac0103bdf2d91de2c1840a1567b",
+          "options": {
+            "mode": "message_only",
+            "incident_id": "{"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Create a Note for an Incident in PagerDuty",
+          "disabled": false,
+          "guid": "6a93e9ac4af0482f192249794bf64196",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents/{{ .create_an_incident_in_pagerduty.body.incident.id }}/notes",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "note": {
+                "content": "Firefighters are on the scene."
+              }
+            },
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "From": "{% global_resource pagerdutyemail %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Manage an Incident in PagerDuty",
+          "disabled": false,
+          "guid": "479120b1ddac74f9939267fcca3444a8",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents",
+            "content_type": "json",
+            "method": "put",
+            "payload": {
+              "incidents": [
+                {
+                  "id": "{{.create_an_incident_in_pagerduty.body.incident.id }}",
+                  "type": "incident_reference"
+                }
+              ]
+            },
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "From": "{% credential pagerdutyemail %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Assign an Incident in PagerDuty",
+          "disabled": false,
+          "guid": "4c5ffaf302463f745af8d13e9cbbb52c",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents",
+            "content_type": "json",
+            "method": "put",
+            "payload": {
+              "incidents": [
+                {
+                  "id": "{{.create_an_incident_in_pagerduty.body.incident.id }}",
+                  "type": "incident_reference",
+                  "priority": {
+                    "id": "{{.list_priorities_in_pagerduty.body.priorities.first.id }}",
+                    "type": "priority_reference"
+                  },
+                  "assignments": [
+                    {
+                      "assignee": {
+                        "id": "PA9OXM2",
+                        "type": "user_reference"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "From": "{% credential pagerdutyemail %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::TriggerAgent",
+          "name": "Trigger if Created",
+          "disabled": false,
+          "guid": "b88afac2a30169bbd0f038aa4be8580c",
+          "options": {
+            "rules": [
+              {
+                "type": "field==value",
+                "value": "201",
+                "path": "{{ .create_an_incident_in_pagerduty.status }}"
+              }
+            ]
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::TriggerAgent",
+          "name": "Trigger to Contain Host",
+          "disabled": false,
+          "guid": "fa86bf59a5cc444105cceea78667c961",
+          "options": {
+            "rules": [
+              {
+                "type": "regex",
+                "value": "contain_host",
+                "path": "{{ .create_a_status_update_for_an_incident_in_pagerduty.prompt.status }}"
+              }
+            ]
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Trigger an Event in PagerDuty",
+          "disabled": false,
+          "guid": "ba4f4d1325e189ef2a746f88916ad405",
+          "options": {
+            "url": "https://{% global_resource pagerdutyevents %}/v2/enqueue",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "payload": {
+                "summary": "Example Summary",
+                "timestamp": "{{ \"now\" | date: \"%Y-%m-%dT%H:%M:%S.%L%z\" }}",
+                "source": "Example source",
+                "severity": "critical"
+              },
+              "component": "{{ optional_component }}",
+              "group": "{{ optional_group }}",
+              "class": "{{ optional_class }} ",
+              "custom_details": {
+                "optional_key": "{{ optional_value }}"
+              },
+              "links": [
+                {
+                  "href": "https://www.example.com",
+                  "text": "Example Link Text"
+                }
+              ],
+              "routing_key": "{% credential pagerdutyroutingkey %}",
+              "dedup_key": "",
+              "event_action": "trigger",
+              "client": "Tines SOAR",
+              "client_url": "{% story_run_link %}"
+            },
+            "headers": {
+
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::WebhookAgent",
+          "name": "Receive for PagerDuty",
+          "disabled": false,
+          "guid": "249c1e73fb7bc51b1025e50674ffb420",
+          "options": {
+            "secret": "c531369e18680f13a6a9bd1e2ebbbfad",
+            "verbs": "get,post"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Create a Status Update for an Incident in PagerDuty",
+          "disabled": false,
+          "guid": "ce803fb81442def71abe6c2b2548a5b2",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents/{{ .create_an_incident_in_pagerduty.body.incident.id }}/status_updates",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "message": "Click the below link to automatically contain and initiate Incident Response playbook: {% line_break%}{% line_break%}{% prompt Contain_Host %}{% line_break%}{% line_break%}"
+            },
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "From": "{% global_resource pagerdutyemail %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Build Results",
+          "disabled": false,
+          "guid": "68267dceb90b2012bf40dd92c755b1d5",
+          "options": {
+            "mode": "message_only",
+            "contain": "true",
+            "device_id": "{{ .receive_for_pagerduty.device_id }}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Create an Incident in PagerDuty",
+          "disabled": false,
+          "guid": "e27af8822f0ccba8b0f91080e4dc0de3",
+          "options": {
+            "url": "https://{% global_resource pagerdutyrestapi %}/incidents",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "incident": {
+                "type": "incident",
+                "title": "IoC on Executive Laptop",
+                "service": {
+                  "id": "{% global_resource pagerdutyserviceid %}",
+                  "type": "service_reference"
+                },
+                "urgency": "high",
+                "body": {
+                  "details": "Hostname : {{ .receive_for_pagerduty.hostname }}\n\nUsername : {{ .receive_for_pagerduty.user_name }}\n\nSystem   : {{ .receive_for_pagerduty.system_manufacturer }}\n\nPlatform : {{ .receive_for_pagerduty.platform_name }}\n\nProduct  : {{ .receive_for_pagerduty.system_product_name }}\n\nOSVersion: {{ .receive_for_pagerduty.os_version }}\n\nTactic   : {{ .receive_for_pagerduty.tactic }}\n\nTechnique   : {{ .receive_for_pagerduty.technique }}\n\n",
+                  "type": "incident_body"
+                },
+                "priority": {
+                  "id": "PHWHM27",
+                  "type": "priority_reference"
+                },
+                "escalation_policy": {
+                  "type": "escalation_policy_reference",
+                  "id": "{% global_resource pagerdutyescalationpolicyid %}"
+                }
+              }
+            },
+            "headers": {
+              "Authorization": "Token token={% credential pagerduty %}",
+              "From": "{% global_resource pagerdutyemail %}",
+              "Accept": "application/vnd.pagerduty+json;version=2"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        }
+      ],
+      "links": [
+        {
+          "source": 0,
+          "receiver": 1
+        },
+        {
+          "source": 1,
+          "receiver": 8
+        },
+        {
+          "source": 2,
+          "receiver": 26
+        },
+        {
+          "source": 3,
+          "receiver": 9
+        },
+        {
+          "source": 4,
+          "receiver": 5
+        },
+        {
+          "source": 6,
+          "receiver": 4
+        },
+        {
+          "source": 7,
+          "receiver": 6
+        },
+        {
+          "source": 8,
+          "receiver": 19
+        },
+        {
+          "source": 11,
+          "receiver": 0
+        },
+        {
+          "source": 12,
+          "receiver": 20
+        },
+        {
+          "source": 13,
+          "receiver": 15
+        },
+        {
+          "source": 14,
+          "receiver": 18
+        },
+        {
+          "source": 15,
+          "receiver": 16
+        },
+        {
+          "source": 17,
+          "receiver": 13
+        },
+        {
+          "source": 18,
+          "receiver": 12
+        },
+        {
+          "source": 19,
+          "receiver": 14
+        },
+        {
+          "source": 20,
+          "receiver": 23
+        },
+        {
+          "source": 22,
+          "receiver": 34
+        },
+        {
+          "source": 23,
+          "receiver": 21
+        },
+        {
+          "source": 23,
+          "receiver": 24
+        },
+        {
+          "source": 24,
+          "receiver": 2
+        },
+        {
+          "source": 26,
+          "receiver": 7
+        },
+        {
+          "source": 28,
+          "receiver": 33
+        },
+        {
+          "source": 29,
+          "receiver": 28
+        },
+        {
+          "source": 30,
+          "receiver": 22
+        },
+        {
+          "source": 31,
+          "receiver": 17
+        },
+        {
+          "source": 32,
+          "receiver": 35
+        },
+        {
+          "source": 33,
+          "receiver": 30
+        },
+        {
+          "source": 35,
+          "receiver": 29
+        }
+      ],
+      "control_links": [
+
+      ],
+      "diagram_layout": "{\"1b27a9a56f0ced9ae4d31de157aaf6a9\":[120,90],\"268a9f89dede62cf6da4e8a4762812a6\":[-90,1110],\"e6022853fd187f5c1b22c46e549d8481\":[15,1515],\"24e4029f6c20cc4a787aebb027dbc926\":[-240,195],\"f44e36654435f6a699688f3b1f31ced1\":[75,1620],\"a6ab9d4155ad6d85337aa7e6cd42de38\":[-45,1425],\"6a93e9ac4af0482f192249794bf64196\":[-75,1215],\"27e614e3d45e24a68358de1f6271f349\":[-75,1305],\"3e28857e6399e0b38b9dd43330d79904\":[150,180],\"249c1e73fb7bc51b1025e50674ffb420\":[675,-210],\"68267dceb90b2012bf40dd92c755b1d5\":[675,360],\"5285bc657bf48b2870b7b6f6e1b28fe0\":[345,-450],\"ba4f4d1325e189ef2a746f88916ad405\":[150,240],\"e4f455ef759a8a7a307abaa6a5a0514e\":[165,390],\"d6a15d7bf0c448ce76bfba3e0180d1c2\":[165,540],\"462465870c352aefc6dcd119b88d394c\":[150,315],\"55e7768efeaa418fc9267309a4715ebd\":[180,480],\"7b7050ce3774b4a843fed1b62f1657fa\":[-165,285],\"ab5caade7b994c03a130aacd59b83e9e\":[-150,360],\"537d4529c815b9ce4ef70a11504cffe2\":[-150,450],\"0ae97419a61b327bb54da652b6338ce9\":[-105,765],\"2152b579892458bdaba263fe22694619\":[-105,540],\"00a5d2f7dc19849e140d0aca5a78ad35\":[-105,630],\"24d778c71c984b65945b3d44ea3e0d5a\":[-105,705],\"b0fcf019a2d66df3fde1bcbe36e1437e\":[-105,855],\"47c298d837deb54de170d87926ffae15\":[120,1020],\"f24b297b3cb0b6997448b0c36570b257\":[-105,930],\"12724941fe40761228ce3d3f4f11ef5b\":[-90,1035],\"4c5ffaf302463f745af8d13e9cbbb52c\":[675,15],\"e27af8822f0ccba8b0f91080e4dc0de3\":[675,-150],\"fa86bf59a5cc444105cceea78667c961\":[675,180],\"7bd4a120a73e5cb9795b94332c02933c\":[675,270],\"78b93ac0103bdf2d91de2c1840a1567b\":[75,0],\"479120b1ddac74f9939267fcca3444a8\":[75,-75],\"ce803fb81442def71abe6c2b2548a5b2\":[675,90],\"b88afac2a30169bbd0f038aa4be8580c\":[675,-75]}",
+      "send_to_story_enabled": true,
+      "entry_agent_guid": "249c1e73fb7bc51b1025e50674ffb420",
+      "exit_agent_guid": "68267dceb90b2012bf40dd92c755b1d5"
+    },
+    {
+      "schema_version": 1,
+      "name": "STS CrowdStrike Search",
+      "description": null,
+      "guid": "762ba5655fa5e6a01bd5108cbd69f5df",
+      "exported_at": "2020-07-02T15:36:48Z",
+      "agents": [
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Explode Detection Details",
+          "disabled": false,
+          "guid": "6c2b2eb4857db6e15930ff806471b123",
+          "options": {
+            "mode": "explode",
+            "path": "{{.get_crowdstrike_detection_details.body.resources}}",
+            "to": "detection_id_details"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Deduplicate Detections by Device and Story Run",
+          "disabled": false,
+          "guid": "2129c03d1be31dd44cefab9f441bacaf",
+          "options": {
+            "mode": "deduplicate",
+            "lookback": "1000",
+            "path": "{{ .explode_detection_details.detection_id_details.device }}{% story_run_guid %}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Search Crowdstrike Detections",
+          "disabled": false,
+          "guid": "7b626cbe7a1e8b4f13321d9bdb7cd907",
+          "options": {
+            "url": "https://{% global_resource crowdstrikeapi %}/detects/queries/detects/v1",
+            "content_type": "json",
+            "method": "get",
+            "payload": {
+              "filter": " status:'new'+first_behavior:>'{{ \"now\" | date: \"%s\" | minus : 2419200 | date: '%Y-%m-%d' }}'+device.device_id:'{{ explode_members.device_ids }}'+behaviors.severity:>'{{ .receive_webhook.severity }}'",
+              "sort": "max_severity.desc"
+            },
+            "headers": {
+              "Authorization": "Bearer {% credential csfalconv11 %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::WebhookAgent",
+          "name": "Receive Webhook",
+          "disabled": false,
+          "guid": "d9c299fdd599126eb2f2b21fe7c62204",
+          "options": {
+            "secret": "6bd210e95e2dbc39366e9d18d8cfaae2",
+            "verbs": "get,post"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Test CrowdStrike Detection Details",
+          "disabled": false,
+          "guid": "3f59c151eb4ac1b4a7a5315d4eafa324",
+          "options": {
+            "url": "https://{% global_resource crowdstrikeapi %}/detects/entities/summaries/GET/v1",
+            "content_type": "json",
+            "method": "post",
+            "headers": {
+              "Authorization": "Bearer {% credential csfalconv11 %}"
+            },
+            "payload": {
+              "ids": [
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233558492201053",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233539139666185",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233616155484416",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233148163424422",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233558492201060",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233536564375725",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233616155484432",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233558492201123",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233536564375819",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233539139666393",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233536564375682",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233539139666353",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233458944577699",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233536564375675",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233009701060698",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233458944577834",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233489961451746",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233148163424382",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233570299167161",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1276868364253413509",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233489961451836",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233539139666401",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233570299167001",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233458944577703",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233458944577722",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272232940302106989",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233458944577796",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233558492201354",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233536564375974",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233539139666181",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233570299167081"
+              ],
+              "sort": "max_severity.desc"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::TriggerAgent",
+          "name": "Trigger if Any",
+          "disabled": false,
+          "guid": "b40cc2ae31a14662b4dde924f02a9289",
+          "options": {
+            "rules": [
+              {
+                "type": "field>=value",
+                "value": "1",
+                "path": "{{ .search_crowdstrike_detections.body.resources.size }}"
+              }
+            ]
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Debug",
+          "disabled": false,
+          "guid": "15b14cf0b26915aa4e97465f0cfe267e",
+          "options": {
+            "mode": "message_only",
+            "hostname": "{{ .explode_detection_details.detection_id_details.device.hostname }}",
+            "ids": [
+              "{{ .explode_detections.all_detection_ids }}"
+            ]
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Get CrowdStrike Detection Details",
+          "disabled": false,
+          "guid": "262ee63791e8a02eef4fbffde3c83210",
+          "options": {
+            "url": "https://{% global_resource crowdstrikeapi %}/detects/entities/summaries/GET/v1",
+            "content_type": "json",
+            "method": "post",
+            "headers": {
+              "Authorization": "Bearer {% credential csfalconv11 %}"
+            },
+            "payload": {
+              "ids": [
+                "{{ .explode_detections.all_detection_ids }}"
+              ]
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Get Crowdstrike Hostgroups",
+          "disabled": false,
+          "guid": "3fddf5e8040ffd6f36feea2bfea1a6a9",
+          "options": {
+            "url": "https://{% global_resource crowdstrikeapi %}/devices/queries/host-groups/v1",
+            "content_type": "json",
+            "method": "get",
+            "payload": {
+              "filter": "name:'{{ .receive_webhook.groupname | downcase }}'"
+            },
+            "headers": {
+              "Authorization": "Bearer {% credential csfalconv11 %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Get Crowdstrike Hostgroup Members",
+          "disabled": false,
+          "guid": "27d10e101a05d4be9d7ea497072309ce",
+          "options": {
+            "url": "https://{% global_resource crowdstrikeapi %}/devices/queries/host-group-members/v1",
+            "content_type": "json",
+            "method": "get",
+            "payload": {
+              "id": "{{ .get_crowdstrike_hostgroups.body.resources.first }}"
+            },
+            "headers": {
+              "Authorization": "Bearer {% credential csfalconv11 %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::SendToStoryAgent",
+          "name": "Send to This Story",
+          "disabled": false,
+          "guid": "f14636b3f5958bd9fe5b16e6fa02eaa2",
+          "options": {
+            "story": "{% story STS CrowdStrike Search %}",
+            "payload": {
+              "groupname": "groupname",
+              "severity": "70"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Build Results",
+          "disabled": false,
+          "guid": "0f0c988fd8484bf4a4adc077903fb64d",
+          "options": {
+            "mode": "message_only",
+            "hostname": "{{ .explode_detection_details.detection_id_details.device.hostname}}",
+            "user_name": "{{ .explode_detection_details.detection_id_details.behaviors.first.user_name}}",
+            "detection_id": "{{ .explode_detection_details.detection_id_details.detection_id}}",
+            "bios_manufacturer": "{{ .explode_detection_details.detection_id_details.device.bios_manufacturer}}",
+            "bios_version": "{{ .explode_detection_details.detection_id_details.device.bios_version}}",
+            "external_ip": "{{ .explode_detection_details.detection_id_details.device.external_ip}}",
+            "local_ip": "{{ .explode_detection_details.detection_id_details.device.local_ip}}",
+            "mac_address": "{{ .explode_detection_details.detection_id_details.device.mac_address}}",
+            "device_id": "{{ .explode_detection_details.detection_id_details.device.device_id}}",
+            "system_manufacturer": "{{ .explode_detection_details.detection_id_details.device.system_manufacturer}}",
+            "platform_name": "{{ .explode_detection_details.detection_id_details.device.platform_name}}",
+            "product_type_desc": "{{ .explode_detection_details.detection_id_details.device.product_type_desc}}",
+            "system_product_name": "{{ .explode_detection_details.detection_id_details.device.system_product_name}}",
+            "os_version": "{{ .explode_detection_details.detection_id_details.device.os_version}}",
+            "tactic": "{{ .explode_detection_details.detection_id_details.behaviors.first.tactic}}",
+            "technique": "{{ .explode_detection_details.detection_id_details.behaviors.first.technique}}",
+            "max_confidence": "{{ .explode_detection_details.detection_id_details.max_confidence}}",
+            "max_severity": "{{ .explode_detection_details.detection_id_details.max_severity}}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Deduplicate Detections",
+          "disabled": false,
+          "guid": "74c3ba48afeeb99a49693df6116a3d56",
+          "options": {
+            "mode": "deduplicate",
+            "lookback": "1000",
+            "path": "{{ .explode_detections.all_detection_ids }}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Explode Members",
+          "disabled": false,
+          "guid": "e23dd42726577aed1356888cb14202e4",
+          "options": {
+            "mode": "explode",
+            "path": "{{.get_crowdstrike_hostgroup_members.body.resources}}",
+            "to": "device_ids"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Explode Detections",
+          "disabled": false,
+          "guid": "d204eda6da1affec72917bb91b847cb4",
+          "options": {
+            "mode": "explode",
+            "path": "{{.search_crowdstrike_detections.body.resources}}",
+            "to": "all_detection_ids"
+          },
+          "keep_events_for": 0
+        }
+      ],
+      "links": [
+        {
+          "source": 0,
+          "receiver": 1
+        },
+        {
+          "source": 1,
+          "receiver": 11
+        },
+        {
+          "source": 2,
+          "receiver": 5
+        },
+        {
+          "source": 3,
+          "receiver": 8
+        },
+        {
+          "source": 5,
+          "receiver": 14
+        },
+        {
+          "source": 7,
+          "receiver": 0
+        },
+        {
+          "source": 8,
+          "receiver": 9
+        },
+        {
+          "source": 9,
+          "receiver": 13
+        },
+        {
+          "source": 12,
+          "receiver": 7
+        },
+        {
+          "source": 13,
+          "receiver": 2
+        },
+        {
+          "source": 14,
+          "receiver": 12
+        }
+      ],
+      "control_links": [
+
+      ],
+      "diagram_layout": "{\"d9c299fdd599126eb2f2b21fe7c62204\":[-165,-105],\"7b626cbe7a1e8b4f13321d9bdb7cd907\":[-165,195],\"262ee63791e8a02eef4fbffde3c83210\":[-165,465],\"b40cc2ae31a14662b4dde924f02a9289\":[-165,285],\"15b14cf0b26915aa4e97465f0cfe267e\":[-765,750],\"3fddf5e8040ffd6f36feea2bfea1a6a9\":[-165,-30],\"27d10e101a05d4be9d7ea497072309ce\":[-165,60],\"f14636b3f5958bd9fe5b16e6fa02eaa2\":[-420,-105],\"e23dd42726577aed1356888cb14202e4\":[-165,135],\"74c3ba48afeeb99a49693df6116a3d56\":[-165,405],\"2129c03d1be31dd44cefab9f441bacaf\":[-165,630],\"d204eda6da1affec72917bb91b847cb4\":[-165,345],\"0f0c988fd8484bf4a4adc077903fb64d\":[-165,750],\"3f59c151eb4ac1b4a7a5315d4eafa324\":[-780,810],\"6c2b2eb4857db6e15930ff806471b123\":[-165,555]}",
+      "send_to_story_enabled": true,
+      "entry_agent_guid": "d9c299fdd599126eb2f2b21fe7c62204",
+      "exit_agent_guid": "0f0c988fd8484bf4a4adc077903fb64d"
+    },
+    {
+      "schema_version": 1,
+      "name": "STS Contain with IR",
+      "description": null,
+      "guid": "682c1cc4a40fb27c63aa04719e0095a8",
+      "exported_at": "2020-07-02T15:36:48Z",
+      "agents": [
+        {
+          "type": "Agents::SendToStoryAgent",
+          "name": "Additional IR Playbook",
+          "disabled": false,
+          "guid": "2cab78669cefdd96b56a3074e97904f2",
+          "options": {
+            "story": "{% story STS IR %}",
+            "payload": {
+              "something": "the event contained {{ .somekey }}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Contain a Device in Crowdstrike Falcon",
+          "disabled": false,
+          "guid": "913ab5279f2d7a6f38313f9090885c05",
+          "options": {
+            "url": "https://{% global_resource crowdstrikeapi %}/devices/entities/devices-actions/v2",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "action_name": "contain",
+              "ids": [
+                "{{ .receive_ir_webhook.device_id }}"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer {% credential csfalconv11 %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Build Results",
+          "disabled": false,
+          "guid": "6d6f609a8cd5a3d99fadf158e7702274",
+          "options": {
+            "mode": "message_only",
+            "message": "This is an automatically generated message from Tines"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::WebhookAgent",
+          "name": "Receive IR Webhook",
+          "disabled": false,
+          "guid": "def12e5494ccf8f91af9035d72c266c3",
+          "options": {
+            "secret": "6f930cdaac816c3a568a46e349226c8c",
+            "verbs": "get,post"
+          },
+          "keep_events_for": 0
+        }
+      ],
+      "links": [
+        {
+          "source": 0,
+          "receiver": 2
+        },
+        {
+          "source": 1,
+          "receiver": 0
+        },
+        {
+          "source": 3,
+          "receiver": 1
+        }
+      ],
+      "control_links": [
+
+      ],
+      "diagram_layout": "{\"def12e5494ccf8f91af9035d72c266c3\":[-450,45],\"6d6f609a8cd5a3d99fadf158e7702274\":[-450,315],\"913ab5279f2d7a6f38313f9090885c05\":[-450,135],\"2cab78669cefdd96b56a3074e97904f2\":[-450,225]}",
+      "send_to_story_enabled": true,
+      "entry_agent_guid": "def12e5494ccf8f91af9035d72c266c3",
+      "exit_agent_guid": "6d6f609a8cd5a3d99fadf158e7702274"
+    }
+  ]
+}

@@ -1,0 +1,610 @@
+{
+  "schema_version": 1,
+  "name": "Scrub STS CrowdStrike Search",
+  "description": null,
+  "guid": "364f3eee0c128c3d6d44443c26b6409d",
+  "exported_at": "2020-07-02T15:27:39Z",
+  "agents": [
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode Detection Details",
+      "disabled": false,
+      "guid": "6c2b2eb4857db6e15930ff806471b123",
+      "options": {
+        "mode": "explode",
+        "path": "{{.get_crowdstrike_detection_details.body.resources}}",
+        "to": "detection_id_details"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Deduplicate Detections by Device and Story Run",
+      "disabled": false,
+      "guid": "2129c03d1be31dd44cefab9f441bacaf",
+      "options": {
+        "mode": "deduplicate",
+        "lookback": "1000",
+        "path": "{{ .explode_detection_details.detection_id_details.device }}{% story_run_guid %}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Search Crowdstrike Detections",
+      "disabled": false,
+      "guid": "7b626cbe7a1e8b4f13321d9bdb7cd907",
+      "options": {
+        "url": "https://{% global_resource crowdstrikeapi %}/detects/queries/detects/v1",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "filter": " status:'new'+first_behavior:>'{{ \"now\" | date: \"%s\" | minus : 2419200 | date: '%Y-%m-%d' }}'+device.device_id:'{{ explode_members.device_ids }}'+behaviors.severity:>'{{ .receive_webhook.severity }}'",
+          "sort": "max_severity.desc"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential csfalconv11 %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "Receive Webhook",
+      "disabled": false,
+      "guid": "d9c299fdd599126eb2f2b21fe7c62204",
+      "options": {
+        "secret": "6bd210e95e2dbc39366e9d18d8cfaae2",
+        "verbs": "get,post"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if Any",
+      "disabled": false,
+      "guid": "b40cc2ae31a14662b4dde924f02a9289",
+      "options": {
+        "rules": [
+          {
+            "type": "field>=value",
+            "value": "1",
+            "path": "{{ .search_crowdstrike_detections.body.resources.size }}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get CrowdStrike Detection Details",
+      "disabled": false,
+      "guid": "262ee63791e8a02eef4fbffde3c83210",
+      "options": {
+        "url": "https://{% global_resource crowdstrikeapi %}/detects/entities/summaries/GET/v1",
+        "content_type": "json",
+        "method": "post",
+        "headers": {
+          "Authorization": "Bearer {% credential csfalconv11 %}"
+        },
+        "payload": {
+          "ids": [
+            "{{ .explode_detections.all_detection_ids }}"
+          ]
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Crowdstrike Hostgroups",
+      "disabled": false,
+      "guid": "3fddf5e8040ffd6f36feea2bfea1a6a9",
+      "options": {
+        "url": "https://{% global_resource crowdstrikeapi %}/devices/queries/host-groups/v1",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "filter": "name:'{{ .receive_webhook.groupname | downcase }}'"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential csfalconv11 %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Crowdstrike Hostgroup Members",
+      "disabled": false,
+      "guid": "27d10e101a05d4be9d7ea497072309ce",
+      "options": {
+        "url": "https://{% global_resource crowdstrikeapi %}/devices/queries/host-group-members/v1",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "id": "{{ .get_crowdstrike_hostgroups.body.resources.first }}"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential csfalconv11 %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::SendToStoryAgent",
+      "name": "Send to This Story",
+      "disabled": false,
+      "guid": "f14636b3f5958bd9fe5b16e6fa02eaa2",
+      "options": {
+        "story": "{% story STS CrowdStrike Search %}",
+        "payload": {
+          "groupname": "groupname",
+          "severity": "70"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Build Results",
+      "disabled": false,
+      "guid": "0f0c988fd8484bf4a4adc077903fb64d",
+      "options": {
+        "mode": "message_only",
+        "hostname": "{{ .explode_detection_details.detection_id_details.device.hostname}}",
+        "user_name": "{{ .explode_detection_details.detection_id_details.behaviors.first.user_name}}",
+        "detection_id": "{{ .explode_detection_details.detection_id_details.detection_id}}",
+        "bios_manufacturer": "{{ .explode_detection_details.detection_id_details.device.bios_manufacturer}}",
+        "bios_version": "{{ .explode_detection_details.detection_id_details.device.bios_version}}",
+        "external_ip": "{{ .explode_detection_details.detection_id_details.device.external_ip}}",
+        "local_ip": "{{ .explode_detection_details.detection_id_details.device.local_ip}}",
+        "mac_address": "{{ .explode_detection_details.detection_id_details.device.mac_address}}",
+        "device_id": "{{ .explode_detection_details.detection_id_details.device.device_id}}",
+        "system_manufacturer": "{{ .explode_detection_details.detection_id_details.device.system_manufacturer}}",
+        "platform_name": "{{ .explode_detection_details.detection_id_details.device.platform_name}}",
+        "product_type_desc": "{{ .explode_detection_details.detection_id_details.device.product_type_desc}}",
+        "system_product_name": "{{ .explode_detection_details.detection_id_details.device.system_product_name}}",
+        "os_version": "{{ .explode_detection_details.detection_id_details.device.os_version}}",
+        "tactic": "{{ .explode_detection_details.detection_id_details.behaviors.first.tactic}}",
+        "technique": "{{ .explode_detection_details.detection_id_details.behaviors.first.technique}}",
+        "max_confidence": "{{ .explode_detection_details.detection_id_details.max_confidence}}",
+        "max_severity": "{{ .explode_detection_details.detection_id_details.max_severity}}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Deduplicate Detections",
+      "disabled": false,
+      "guid": "74c3ba48afeeb99a49693df6116a3d56",
+      "options": {
+        "mode": "deduplicate",
+        "lookback": "1000",
+        "path": "{{ .explode_detections.all_detection_ids }}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode Members",
+      "disabled": false,
+      "guid": "e23dd42726577aed1356888cb14202e4",
+      "options": {
+        "mode": "explode",
+        "path": "{{.get_crowdstrike_hostgroup_members.body.resources}}",
+        "to": "device_ids"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode Detections",
+      "disabled": false,
+      "guid": "d204eda6da1affec72917bb91b847cb4",
+      "options": {
+        "mode": "explode",
+        "path": "{{.search_crowdstrike_detections.body.resources}}",
+        "to": "all_detection_ids"
+      },
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 1
+    },
+    {
+      "source": 1,
+      "receiver": 9
+    },
+    {
+      "source": 2,
+      "receiver": 4
+    },
+    {
+      "source": 3,
+      "receiver": 6
+    },
+    {
+      "source": 4,
+      "receiver": 12
+    },
+    {
+      "source": 5,
+      "receiver": 0
+    },
+    {
+      "source": 6,
+      "receiver": 7
+    },
+    {
+      "source": 7,
+      "receiver": 11
+    },
+    {
+      "source": 10,
+      "receiver": 5
+    },
+    {
+      "source": 11,
+      "receiver": 2
+    },
+    {
+      "source": 12,
+      "receiver": 10
+    }
+  ],
+  "control_links": [
+
+  ],
+  "diagram_layout": "{\"d9c299fdd599126eb2f2b21fe7c62204\":[105,-1245],\"7b626cbe7a1e8b4f13321d9bdb7cd907\":[105,-810],\"262ee63791e8a02eef4fbffde3c83210\":[105,-375],\"b40cc2ae31a14662b4dde924f02a9289\":[105,-705],\"3fddf5e8040ffd6f36feea2bfea1a6a9\":[105,-1140],\"27d10e101a05d4be9d7ea497072309ce\":[105,-1020],\"f14636b3f5958bd9fe5b16e6fa02eaa2\":[345,-1245],\"e23dd42726577aed1356888cb14202e4\":[105,-915],\"74c3ba48afeeb99a49693df6116a3d56\":[105,-495],\"2129c03d1be31dd44cefab9f441bacaf\":[105,-135],\"d204eda6da1affec72917bb91b847cb4\":[105,-600],\"0f0c988fd8484bf4a4adc077903fb64d\":[105,-30],\"6c2b2eb4857db6e15930ff806471b123\":[105,-270]}",
+  "send_to_story_enabled": true,
+  "entry_agent_guid": "d9c299fdd599126eb2f2b21fe7c62204",
+  "exit_agent_guid": "0f0c988fd8484bf4a4adc077903fb64d",
+  "send_to_stories": [
+    {
+      "schema_version": 1,
+      "name": "STS CrowdStrike Search",
+      "description": null,
+      "guid": "762ba5655fa5e6a01bd5108cbd69f5df",
+      "exported_at": "2020-07-02T15:27:39Z",
+      "agents": [
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Explode Detection Details",
+          "disabled": false,
+          "guid": "6c2b2eb4857db6e15930ff806471b123",
+          "options": {
+            "mode": "explode",
+            "path": "{{.get_crowdstrike_detection_details.body.resources}}",
+            "to": "detection_id_details"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Deduplicate Detections by Device and Story Run",
+          "disabled": false,
+          "guid": "2129c03d1be31dd44cefab9f441bacaf",
+          "options": {
+            "mode": "deduplicate",
+            "lookback": "1000",
+            "path": "{{ .explode_detection_details.detection_id_details.device }}{% story_run_guid %}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Search Crowdstrike Detections",
+          "disabled": false,
+          "guid": "7b626cbe7a1e8b4f13321d9bdb7cd907",
+          "options": {
+            "url": "https://{% global_resource crowdstrikeapi %}/detects/queries/detects/v1",
+            "content_type": "json",
+            "method": "get",
+            "payload": {
+              "filter": " status:'new'+first_behavior:>'{{ \"now\" | date: \"%s\" | minus : 2419200 | date: '%Y-%m-%d' }}'+device.device_id:'{{ explode_members.device_ids }}'+behaviors.severity:>'{{ .receive_webhook.severity }}'",
+              "sort": "max_severity.desc"
+            },
+            "headers": {
+              "Authorization": "Bearer {% credential csfalconv11 %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::WebhookAgent",
+          "name": "Receive Webhook",
+          "disabled": false,
+          "guid": "d9c299fdd599126eb2f2b21fe7c62204",
+          "options": {
+            "secret": "6bd210e95e2dbc39366e9d18d8cfaae2",
+            "verbs": "get,post"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Test CrowdStrike Detection Details",
+          "disabled": false,
+          "guid": "3f59c151eb4ac1b4a7a5315d4eafa324",
+          "options": {
+            "url": "https://{% global_resource crowdstrikeapi %}/detects/entities/summaries/GET/v1",
+            "content_type": "json",
+            "method": "post",
+            "headers": {
+              "Authorization": "Bearer {% credential csfalconv11 %}"
+            },
+            "payload": {
+              "ids": [
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233558492201053",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233539139666185",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233616155484416",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233148163424422",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233558492201060",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233536564375725",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233616155484432",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233558492201123",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233536564375819",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233539139666393",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233536564375682",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233539139666353",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233458944577699",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233536564375675",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233009701060698",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233458944577834",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233489961451746",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233148163424382",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233570299167161",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1276868364253413509",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233489961451836",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233539139666401",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233570299167001",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233458944577703",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233458944577722",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272232940302106989",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233458944577796",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233558492201354",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233536564375974",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233539139666181",
+                "ldt:af42b6b7b00344fb7452287d314c3636:1272233570299167081"
+              ],
+              "sort": "max_severity.desc"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::TriggerAgent",
+          "name": "Trigger if Any",
+          "disabled": false,
+          "guid": "b40cc2ae31a14662b4dde924f02a9289",
+          "options": {
+            "rules": [
+              {
+                "type": "field>=value",
+                "value": "1",
+                "path": "{{ .search_crowdstrike_detections.body.resources.size }}"
+              }
+            ]
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Debug",
+          "disabled": false,
+          "guid": "15b14cf0b26915aa4e97465f0cfe267e",
+          "options": {
+            "mode": "message_only",
+            "hostname": "{{ .explode_detection_details.detection_id_details.device.hostname }}",
+            "ids": [
+              "{{ .explode_detections.all_detection_ids }}"
+            ]
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Get CrowdStrike Detection Details",
+          "disabled": false,
+          "guid": "262ee63791e8a02eef4fbffde3c83210",
+          "options": {
+            "url": "https://{% global_resource crowdstrikeapi %}/detects/entities/summaries/GET/v1",
+            "content_type": "json",
+            "method": "post",
+            "headers": {
+              "Authorization": "Bearer {% credential csfalconv11 %}"
+            },
+            "payload": {
+              "ids": [
+                "{{ .explode_detections.all_detection_ids }}"
+              ]
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Get Crowdstrike Hostgroups",
+          "disabled": false,
+          "guid": "3fddf5e8040ffd6f36feea2bfea1a6a9",
+          "options": {
+            "url": "https://{% global_resource crowdstrikeapi %}/devices/queries/host-groups/v1",
+            "content_type": "json",
+            "method": "get",
+            "payload": {
+              "filter": "name:'{{ .receive_webhook.groupname | downcase }}'"
+            },
+            "headers": {
+              "Authorization": "Bearer {% credential csfalconv11 %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Get Crowdstrike Hostgroup Members",
+          "disabled": false,
+          "guid": "27d10e101a05d4be9d7ea497072309ce",
+          "options": {
+            "url": "https://{% global_resource crowdstrikeapi %}/devices/queries/host-group-members/v1",
+            "content_type": "json",
+            "method": "get",
+            "payload": {
+              "id": "{{ .get_crowdstrike_hostgroups.body.resources.first }}"
+            },
+            "headers": {
+              "Authorization": "Bearer {% credential csfalconv11 %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::SendToStoryAgent",
+          "name": "Send to This Story",
+          "disabled": false,
+          "guid": "f14636b3f5958bd9fe5b16e6fa02eaa2",
+          "options": {
+            "story": "{% story STS CrowdStrike Search %}",
+            "payload": {
+              "groupname": "groupname",
+              "severity": "70"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Build Results",
+          "disabled": false,
+          "guid": "0f0c988fd8484bf4a4adc077903fb64d",
+          "options": {
+            "mode": "message_only",
+            "hostname": "{{ .explode_detection_details.detection_id_details.device.hostname}}",
+            "user_name": "{{ .explode_detection_details.detection_id_details.behaviors.first.user_name}}",
+            "detection_id": "{{ .explode_detection_details.detection_id_details.detection_id}}",
+            "bios_manufacturer": "{{ .explode_detection_details.detection_id_details.device.bios_manufacturer}}",
+            "bios_version": "{{ .explode_detection_details.detection_id_details.device.bios_version}}",
+            "external_ip": "{{ .explode_detection_details.detection_id_details.device.external_ip}}",
+            "local_ip": "{{ .explode_detection_details.detection_id_details.device.local_ip}}",
+            "mac_address": "{{ .explode_detection_details.detection_id_details.device.mac_address}}",
+            "device_id": "{{ .explode_detection_details.detection_id_details.device.device_id}}",
+            "system_manufacturer": "{{ .explode_detection_details.detection_id_details.device.system_manufacturer}}",
+            "platform_name": "{{ .explode_detection_details.detection_id_details.device.platform_name}}",
+            "product_type_desc": "{{ .explode_detection_details.detection_id_details.device.product_type_desc}}",
+            "system_product_name": "{{ .explode_detection_details.detection_id_details.device.system_product_name}}",
+            "os_version": "{{ .explode_detection_details.detection_id_details.device.os_version}}",
+            "tactic": "{{ .explode_detection_details.detection_id_details.behaviors.first.tactic}}",
+            "technique": "{{ .explode_detection_details.detection_id_details.behaviors.first.technique}}",
+            "max_confidence": "{{ .explode_detection_details.detection_id_details.max_confidence}}",
+            "max_severity": "{{ .explode_detection_details.detection_id_details.max_severity}}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Deduplicate Detections",
+          "disabled": false,
+          "guid": "74c3ba48afeeb99a49693df6116a3d56",
+          "options": {
+            "mode": "deduplicate",
+            "lookback": "1000",
+            "path": "{{ .explode_detections.all_detection_ids }}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Explode Members",
+          "disabled": false,
+          "guid": "e23dd42726577aed1356888cb14202e4",
+          "options": {
+            "mode": "explode",
+            "path": "{{.get_crowdstrike_hostgroup_members.body.resources}}",
+            "to": "device_ids"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Explode Detections",
+          "disabled": false,
+          "guid": "d204eda6da1affec72917bb91b847cb4",
+          "options": {
+            "mode": "explode",
+            "path": "{{.search_crowdstrike_detections.body.resources}}",
+            "to": "all_detection_ids"
+          },
+          "keep_events_for": 0
+        }
+      ],
+      "links": [
+        {
+          "source": 0,
+          "receiver": 1
+        },
+        {
+          "source": 1,
+          "receiver": 11
+        },
+        {
+          "source": 2,
+          "receiver": 5
+        },
+        {
+          "source": 3,
+          "receiver": 8
+        },
+        {
+          "source": 5,
+          "receiver": 14
+        },
+        {
+          "source": 7,
+          "receiver": 0
+        },
+        {
+          "source": 8,
+          "receiver": 9
+        },
+        {
+          "source": 9,
+          "receiver": 13
+        },
+        {
+          "source": 12,
+          "receiver": 7
+        },
+        {
+          "source": 13,
+          "receiver": 2
+        },
+        {
+          "source": 14,
+          "receiver": 12
+        }
+      ],
+      "control_links": [
+
+      ],
+      "diagram_layout": "{\"d9c299fdd599126eb2f2b21fe7c62204\":[-165,-105],\"7b626cbe7a1e8b4f13321d9bdb7cd907\":[-165,195],\"262ee63791e8a02eef4fbffde3c83210\":[-165,465],\"b40cc2ae31a14662b4dde924f02a9289\":[-165,285],\"15b14cf0b26915aa4e97465f0cfe267e\":[-765,750],\"3fddf5e8040ffd6f36feea2bfea1a6a9\":[-165,-30],\"27d10e101a05d4be9d7ea497072309ce\":[-165,60],\"f14636b3f5958bd9fe5b16e6fa02eaa2\":[-420,-105],\"e23dd42726577aed1356888cb14202e4\":[-165,135],\"74c3ba48afeeb99a49693df6116a3d56\":[-165,405],\"2129c03d1be31dd44cefab9f441bacaf\":[-165,630],\"d204eda6da1affec72917bb91b847cb4\":[-165,345],\"0f0c988fd8484bf4a4adc077903fb64d\":[-165,750],\"3f59c151eb4ac1b4a7a5315d4eafa324\":[-780,810],\"6c2b2eb4857db6e15930ff806471b123\":[-165,555]}",
+      "send_to_story_enabled": true,
+      "entry_agent_guid": "d9c299fdd599126eb2f2b21fe7c62204",
+      "exit_agent_guid": "0f0c988fd8484bf4a4adc077903fb64d"
+    }
+  ]
+}

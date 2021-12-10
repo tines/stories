@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "name": "Scrub STS Contain with IR",
+  "description": null,
+  "guid": "f4e719c19cfa322b2b40450d668c43bc",
+  "exported_at": "2020-07-02T15:30:59Z",
+  "agents": [
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Build Results",
+      "disabled": false,
+      "guid": "6d6f609a8cd5a3d99fadf158e7702274",
+      "options": {
+        "mode": "message_only",
+        "message": "This is an automatically generated message from Tines"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "Receive IR Webhook",
+      "disabled": false,
+      "guid": "def12e5494ccf8f91af9035d72c266c3",
+      "options": {
+        "secret": "6f930cdaac816c3a568a46e349226c8c",
+        "verbs": "get,post"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::SendToStoryAgent",
+      "name": "Additional IR Playbook",
+      "disabled": false,
+      "guid": "2cab78669cefdd96b56a3074e97904f2",
+      "options": {
+        "story": "{% story STS IR %}",
+        "payload": {
+          "key": "value",
+          "something": "the event contained {{ .somekey }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Contain a Device in Crowdstrike Falcon",
+      "disabled": false,
+      "guid": "913ab5279f2d7a6f38313f9090885c05",
+      "options": {
+        "url": "https://{% global_resource crowdstrikeapi %}/devices/entities/devices-actions/v2",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "action_name": "contain",
+          "ids": [
+            "{{ .receive_ir_webhook.device_id }}"
+          ]
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential csfalconv11 %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 1,
+      "receiver": 3
+    },
+    {
+      "source": 2,
+      "receiver": 0
+    },
+    {
+      "source": 3,
+      "receiver": 2
+    }
+  ],
+  "control_links": [
+
+  ],
+  "diagram_layout": "{\"def12e5494ccf8f91af9035d72c266c3\":[-450,45],\"6d6f609a8cd5a3d99fadf158e7702274\":[-450,315],\"913ab5279f2d7a6f38313f9090885c05\":[-450,135],\"2cab78669cefdd96b56a3074e97904f2\":[-450,225]}",
+  "send_to_story_enabled": true,
+  "entry_agent_guid": "def12e5494ccf8f91af9035d72c266c3",
+  "exit_agent_guid": "6d6f609a8cd5a3d99fadf158e7702274",
+  "send_to_stories": [
+    {
+      "schema_version": 1,
+      "name": "STS IR",
+      "description": null,
+      "guid": "2a3ac50e7c54cc73c110a02548fd5baa",
+      "exported_at": "2020-07-02T15:30:59Z",
+      "agents": [
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Event Transform Agent",
+          "disabled": false,
+          "guid": "11174237381f0f55bd4d25674a9e0937",
+          "options": {
+            "mode": "message_only",
+            "message": "This is an automatically generated message from Tines"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::WebhookAgent",
+          "name": "Webhook Agent",
+          "disabled": false,
+          "guid": "c2312bd5dccfea8a9eee91497ab64a58",
+          "options": {
+            "secret": "735e98d2986548056f288c89c22abbd4",
+            "verbs": "get,post"
+          },
+          "keep_events_for": 0
+        }
+      ],
+      "links": [
+        {
+          "source": 1,
+          "receiver": 0
+        }
+      ],
+      "control_links": [
+
+      ],
+      "diagram_layout": "{\"c2312bd5dccfea8a9eee91497ab64a58\":[-525,45],\"11174237381f0f55bd4d25674a9e0937\":[-510,135]}",
+      "send_to_story_enabled": true,
+      "entry_agent_guid": "c2312bd5dccfea8a9eee91497ab64a58",
+      "exit_agent_guid": "11174237381f0f55bd4d25674a9e0937"
+    }
+  ]
+}
