@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "name": "MS Graph - Subscriptions",
+  "description": "This story configures a Subscription to an O365 mailbox through the Graph API.\n\n1) \"Set Up Subscription\" Agent - Sends the initial request to graph containing necessary information including expiry time, destination webhook and resource that should be subscribed to.\n\n2) \"Receive o365 Mails\" - a Tines Webhook that will ultimately receive email as they arrive. As part of the enrollment, this webhook will receive a request from MSGraph containing a token, and will echo the token back to Graph to confirm the subscription. The location of this webhook should be copied into the 'notification' field in the Set Up Subscription agent. An event coming to this webhook will contain an array of mail IDs. This array will need to be exploded, and a second call to retrieve the mail body is then run.\n\n3) \"Renew Subscription Agent\" - Subscriptions only last  a little under 3 days, so it will need to be regularly renewed. The ID of the Subscription should be taken from the \"Set Up Subscription\" agent and put at the end of the url in Renew Subscription - https://graph.microsoft.com/v1.0/subscriptions/<id>\nThis agent can be configured to run every 2 days, but running once a day is probably best practice.\n\n4) If necessary, all subscriptions can be queried and deleted using the \"Get Subsctipions\" -> \"Delete Subscription\" flow.\n\nIf two subscriptions are configured on the one mailbox, then duplicate mails will be received.",
+  "guid": "ccf33fdeb7b1082484f02930ee032779",
+  "exported_at": "2020-05-07T15:38:01Z",
+  "agents": [
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Set Up Subscription",
+      "disabled": false,
+      "guid": "c2c41baa080bc40b6f1beda5f4dae851",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/subscriptions",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "changeType": "created",
+          "notificationUrl": "https://lingering-hill-6077.tines.io/webhook/eb8ec703836239ac2a6e98063f367ab7/ba537fee4baec48bebc34b57a6b2ca88",
+          "resource": "/me/mailfolders('inbox')/messages",
+          "expirationDateTime": "{{ \"now\" | date: \"%s\" | plus: 240000 | date: \"%Y-%m-%dT%H:%M:%S.%H%M%d0Z\" }}",
+          "clientState": "SecretClientState"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential msgraph_o365_api %}"
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Deduplicate Events",
+      "disabled": false,
+      "guid": "5041aaa2967a741d010af0843837061c",
+      "options": {
+        "mode": "deduplicate",
+        "lookback": "1000",
+        "path": "{{.explode_subscription_array.individual_mail.resourceData.id}}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "Receive o365 Mails",
+      "disabled": false,
+      "guid": "eb8ec703836239ac2a6e98063f367ab7",
+      "options": {
+        "secret": "ba537fee4baec48bebc34b57a6b2ca88",
+        "verbs": "get,post",
+        "response_code": "200",
+        "response": "{{.validationToken}}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Subscriptions",
+      "disabled": false,
+      "guid": "330943c82bcbae0534c7a2856be61f3c",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/subscriptions",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {% credential msgraph_o365_api %}"
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode an Array",
+      "disabled": false,
+      "guid": "220ad4d3c2986350c0cc44e6f427f72c",
+      "options": {
+        "mode": "explode",
+        "path": "{{.get_subscriptions.body.value}}",
+        "to": "individual_record",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Delete Subscription",
+      "disabled": false,
+      "guid": "05b9b1af2764f97aadf8164c3b0d12e2",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/subscriptions/{{.explode_an_array.individual_record.id}}",
+        "content_type": "json",
+        "method": "Delete",
+        "headers": {
+          "Authorization": "Bearer {% credential msgraph_o365_api %}"
+        }
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Mark Mail as Read",
+      "disabled": false,
+      "guid": "4f9348699f848820ea9d5fecccbd10bd",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/me/messages/{{.explode_subscription_array.individual_mail.resourceData.id}}",
+        "content_type": "json",
+        "method": "patch",
+        "payload": {
+          "isRead": "true"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential msgraph_o365_api %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode Subscription Array",
+      "disabled": false,
+      "guid": "8aa37d56afeeb3f84c3eeb78717152a3",
+      "options": {
+        "mode": "explode",
+        "path": "{{.receive_o365_mails.value}}",
+        "to": "individual_mail",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Mail Content",
+      "disabled": false,
+      "guid": "6640cbe12ad63e5dd4ecd85dfd902af5",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/me/messages/{{.explode_subscription_array.individual_mail.resourceData.id}}",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {% credential msgraph_o365_api %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Renew Subscription",
+      "disabled": false,
+      "guid": "34472fa6f78f2e6448a4f2849c44dded",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/subscriptions/d609dc3c-ca8e-4a1b-88e3-dbc7c25d3a0b",
+        "content_type": "json",
+        "method": "patch",
+        "payload": {
+          "expirationDateTime": "{{ \"now\" | date: \"%s\" | plus: 240000 | date: \"%Y-%m-%dT%H:%M:%S.%H%M%d0Z\" }}"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential msgraph_o365_api %}"
+        }
+      },
+      "schedule": "every_1d",
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 1,
+      "receiver": 8
+    },
+    {
+      "source": 2,
+      "receiver": 7
+    },
+    {
+      "source": 3,
+      "receiver": 4
+    },
+    {
+      "source": 4,
+      "receiver": 5
+    },
+    {
+      "source": 7,
+      "receiver": 1
+    },
+    {
+      "source": 8,
+      "receiver": 6
+    }
+  ],
+  "control_links": [
+
+  ],
+  "diagram_layout": "{\"c2c41baa080bc40b6f1beda5f4dae851\":[525,45],\"eb8ec703836239ac2a6e98063f367ab7\":[765,45],\"6640cbe12ad63e5dd4ecd85dfd902af5\":[765,315],\"8aa37d56afeeb3f84c3eeb78717152a3\":[765,120],\"5041aaa2967a741d010af0843837061c\":[765,225],\"4f9348699f848820ea9d5fecccbd10bd\":[765,405],\"34472fa6f78f2e6448a4f2849c44dded\":[270,45],\"330943c82bcbae0534c7a2856be61f3c\":[30,45],\"05b9b1af2764f97aadf8164c3b0d12e2\":[30,225],\"220ad4d3c2986350c0cc44e6f427f72c\":[30,135]}",
+  "send_to_story_enabled": null,
+  "entry_agent_guid": null,
+  "exit_agent_guid": null,
+  "send_to_stories": [
+
+  ]
+}
