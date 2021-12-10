@@ -1,0 +1,466 @@
+{
+  "schema_version": 1,
+  "name": "Slack Chatbot",
+  "description": "A Slack Chatbot",
+  "guid": "d1fc936df5e5f574db183a972e2d7745",
+  "exported_at": "2019-08-19T15:43:31Z",
+  "agents": [
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Check URLHaus for Domain",
+      "disabled": false,
+      "guid": "06bff06ac1e0bb6f487ba4258cda1ac9",
+      "options": {
+        "url": "https://urlhaus-api.abuse.ch/v1/host/",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "host": "{{.explode_domains.individual_domain}}"
+        },
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1",
+        "fail_on_status": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Send Rich Slack Response",
+      "disabled": false,
+      "guid": "29448c5fbcc4345d354bdfcb6707fed2",
+      "options": {
+        "url": "https://slack.com/api/chat.postMessage",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "channel": "{{.receive_commands.channel_id}}",
+          "attachments": [
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Your /analyzedomain results are complete:"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Domain:*{% line_break %}{{.explode_domains.individual_domain}}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Forcepoint Categorization:*{% line_break %}{{.build_results.forcepoint_category}}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*URLHaus Categorization:*{% line_break %}{{.build_results.urlhaus}}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Domain Age:*{% line_break %}{{.build_results.domain_age}} day(s) old"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "Whitelist"
+                      },
+                      "style": "primary",
+                      "url": "{% prompt whitelist %}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "Block Domain"
+                      },
+                      "style": "danger",
+                      "url": "{% prompt block %}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential slack_chatbot %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "parse json",
+      "disabled": false,
+      "guid": "2ec358eee2676e9344afc471afe7887a",
+      "options": {
+        "mode": "message_only",
+        "message": "{{.receive_slack_interactive_webhook.payload | json_parse | as_object}}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "extract domains",
+      "disabled": false,
+      "guid": "431dbfe061795562d013af4171939a4a",
+      "options": {
+        "mode": "extract",
+        "matchers": [
+          {
+            "path": "{{.receive_commands.text}}",
+            "regexp": "(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]",
+            "to": "domain"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if AnalyzeDomain",
+      "disabled": false,
+      "guid": "46c342631c71f04180abb423eaa8a305",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "/analyzedomain",
+            "path": "{{.receive_commands.command}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Domain Age",
+      "disabled": false,
+      "guid": "57f760bf9125c97e54331877826b01dd",
+      "options": {
+        "url": "https://ipty.de/domage/api.php?domain=",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "domain": "{{.explode_domains.individual_domain}}",
+          "mode": "full"
+        },
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1",
+        "fail_on_status": "true"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "search domain in virustotal",
+      "disabled": false,
+      "guid": "5eb130d29ee44bf16235350ecadd4826",
+      "options": {
+        "url": "https://www.virustotal.com/vtapi/v2/domain/report",
+        "method": "get",
+        "payload": {
+          "apikey": "{% credential virustotal %}",
+          "domain": "{{.explode_domains.individual_domain}}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "trigger to block",
+      "disabled": false,
+      "guid": "631a61981002423082c8c7a7a7edf79b",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "block",
+            "path": "{{ .send_rich_slack_response.prompt.status }}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "receive commands",
+      "disabled": false,
+      "guid": "818362f329346d8e1864d2168bb94a77",
+      "options": {
+        "secret": "5d2cb2c53eba90eaa6c5e71597ec675a",
+        "verbs": "get,post",
+        "expected_update_period_in_days": 1,
+        "response": "Hi {{.user_name}}! Thanks for submitting your {{.command}} request to Tines, we're analyzing now"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Send Basic Slack Response",
+      "disabled": true,
+      "guid": "bedd76568ea8c417b44946ed7a5954ae",
+      "options": {
+        "url": "https://slack.com/api/chat.postMessage",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "channel": "{{.receive_commands.channel_id}}",
+          "text": "We have completed analysis of the domain {{.explode_domains.individual_domain}}.{% line_break %}*Forcepoint Categorization:* {{.build_results.forcepoint_category}}{% line_break %}*URLHaus Categorization:* {{.build_results.urlhaus}}{% line_break %}*Domain Age:* {{.build_results.domain_age}} days old"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential slack_chatbot %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Post Message to Webhook",
+      "disabled": false,
+      "guid": "c07e29bb5fc612228bd32808e31f7dff",
+      "options": {
+        "url": "https://hooks.slack.com/services/xxxx/xxxx/xxxx",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "text": "P2 Alert: a host has just been isolated"
+        },
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "explode domains",
+      "disabled": false,
+      "guid": "c957d3a71fee269632e33038b7b5c25c",
+      "options": {
+        "mode": "explode",
+        "path": "{{.extract_domains.domain}}",
+        "to": "individual_domain",
+        "expected_update_period_in_days": "1"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "Receive Slack Interactive Webhook",
+      "disabled": false,
+      "guid": "ca1bff664f9fd661cb41a09fecca294f",
+      "options": {
+        "secret": "2ab25132938bdb2d848ea05b315e666e",
+        "verbs": "get,post",
+        "expected_update_period_in_days": 1
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "build results",
+      "disabled": false,
+      "guid": "d8f8736c214d8355f142c269326d149a",
+      "options": {
+        "mode": "message_only",
+        "forcepoint_category": "{{.search_domain_in_virustotal.body['Forcepoint ThreatSeeker category']}}",
+        "urlhaus": "{% if check_urlhaus_for_domain.body.query_status contains \"no_results\" %}Clean{% elsif .check_urlhaus_for_domain.body.url_count != 0 %}Malicious{% else %}Unknown{% endif %}",
+        "domain_age": "{{.get_domain_age.body.result.creation.fulldays}}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "search slack users by email",
+      "disabled": false,
+      "guid": "eaacba2a570e54b8bf70ce414d8a6954",
+      "options": {
+        "url": "https://slack.com/api/users.lookupByEmail?email=thomas@tines.io",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {% credential slack_chatbot %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "send slack message by DM",
+      "disabled": false,
+      "guid": "f21ffe00517fa6434625d80a4f3d27cf",
+      "options": {
+        "url": "https://slack.com/api/chat.postMessage",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "channel": "{{.search_slack_users_by_email.body.user.id}}",
+          "attachments": [
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Action Required:* We detected a suspicious Login on your account"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Type:* VPN Login{% line_break %}*Date:* Aug 10-Aug 19{% line_break %}*Location:* Cairo, Egypt{% line_break %}*Device:* Macbook Pro 13 inch 2015 {% line_break %}*Time:* 28/07/2019 at 15:42 GMT{% line_break %}*Comments:*{% line_break %}\"We detected a suspicious login on your account, please let us know if you recognize this activity\""
+                  },
+                  "accessory": {
+                    "type": "image",
+                    "image_url": "https://api.slack.com/img/blocks/bkb_template_images/approvalsNewDevice.png",
+                    "alt_text": "computer thumbnail"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "I recognize this activity"
+                      },
+                      "style": "primary",
+                      "url": "{% prompt legit %}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "I do not recognize this activity"
+                      },
+                      "style": "danger",
+                      "url": "{% prompt unrecognized %}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential slack_chatbot %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "trigger to whitelist",
+      "disabled": false,
+      "guid": "f94702b8f92fc9efb0997915606fce8b",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "whitelist",
+            "path": "{{ .send_rich_slack_response.prompt.status }}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 5
+    },
+    {
+      "source": 1,
+      "receiver": 7
+    },
+    {
+      "source": 1,
+      "receiver": 16
+    },
+    {
+      "source": 3,
+      "receiver": 11
+    },
+    {
+      "source": 4,
+      "receiver": 3
+    },
+    {
+      "source": 5,
+      "receiver": 13
+    },
+    {
+      "source": 6,
+      "receiver": 0
+    },
+    {
+      "source": 8,
+      "receiver": 4
+    },
+    {
+      "source": 11,
+      "receiver": 6
+    },
+    {
+      "source": 12,
+      "receiver": 2
+    },
+    {
+      "source": 13,
+      "receiver": 1
+    },
+    {
+      "source": 13,
+      "receiver": 9
+    },
+    {
+      "source": 14,
+      "receiver": 15
+    }
+  ],
+  "control_links": [
+
+  ]
+}
