@@ -1,0 +1,363 @@
+{
+  "schema_version": 1,
+  "name": "Scrub Blog Time Travel",
+  "description": null,
+  "guid": "aaca36f6a9fd6448cce8096d044b80b2",
+  "exported_at": "2020-07-13T09:08:06Z",
+  "agents": [
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "Receive Webhook",
+      "disabled": false,
+      "guid": "a5c93df25ecde0242ad4ba46e002e3d8",
+      "options": {
+        "secret": "91ae0e87947f125248bd01c444d65805",
+        "verbs": "get,post"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Slack Auth Test of Oauth2.0",
+      "disabled": false,
+      "guid": "5ce1d78005b04278e72d529b50a2abdc",
+      "options": {
+        "url": "https://slack.com/api/auth.test",
+        "content_type": "json",
+        "method": "post",
+        "headers": {
+          "Authorization": "Bearer {% credential slack %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Explode Logs",
+      "disabled": false,
+      "guid": "e8d721ae3cd58719681ddb41dd4bb064",
+      "options": {
+        "mode": "explode",
+        "path": "{{.search_logs_in_datadog.body.logs }}",
+        "to": "crowdsource_logs"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Enrich IP from AbuseDB",
+      "disabled": false,
+      "guid": "5fd5d00326ed3070002b9ce1abbb637e",
+      "options": {
+        "url": "https://{% global_resource abuseipdb %}/api/v2/check",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "maxAgeInDays": "90",
+          "ipAddress": "{{ .explode_logs.crowdsource_logs.content.attributes.crowdsource_ip }}",
+          "verbose": "true"
+        },
+        "headers": {
+          "key": "{% credential abuseipdb %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if NOT the User",
+      "disabled": false,
+      "guid": "e9ccc9b0e338966e2fdabad634a06a49",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "false",
+            "path": "{{ .send_user_a_slack_message_with_prompts_for_confirmation.prompt }}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger on System Logs",
+      "disabled": false,
+      "guid": "25399905f32a703491f6f186f16cce6f",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": ".",
+            "path": "{{ .explode_logs.crowdsource_logs.content.attributes.crowdsource_user }}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if User",
+      "disabled": false,
+      "guid": "5cf24426c092bec646a14e39487ffb9e",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "true",
+            "path": "{{ .send_user_a_slack_message_with_prompts_for_confirmation.prompt }}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::SendToStoryAgent",
+      "name": "Initiate Incident Response Playbook",
+      "disabled": false,
+      "guid": "49a2797fda3d50374c4670f859f311ed",
+      "options": {
+        "story": "{% story STS IR %}",
+        "payload": {
+          "something": "the event contained {{ .somekey }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Send User a Slack Message with Prompts for Confirmation",
+      "disabled": false,
+      "guid": "b6ecbf0b4682183f45bee7d0b308704d",
+      "options": {
+        "url": "https://slack.com/api/chat.postMessage",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "channel": "{{.search_slack_users_by_username.body.user.id}}",
+          "attachments": [
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Location:*{% line_break %} {{ .enrich_ip_from_abusedb.body.data.countryName }}{% line_break %}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Date/Time:*{% line_break %} {{ .explode_logs.crowdsource_logs.content.attributes.crowdsource_date }}{% line_break %}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*ISP/Organisation:*{% line_break %} {{ .enrich_ip_from_abusedb.body.data.isp}}{% line_break %}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*IPv{{ .enrich_ip_from_abusedb.body.data.ipVersion}} Address:*{% line_break %} {{ .explode_logs.crowdsource_logs.content.attributes.crowdsource_ip }}{% line_break %}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Service (version):*{% line_break %} {{ .explode_logs.crowdsource_logs.content.attributes.crowdsource_service }} ({{ .explode_logs.crowdsource_logs.content.attributes.crowdsource_serviceversion }}){% line_break %}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Malicious IP Rating:*{% line_break %} {{ .enrich_ip_from_abusedb.body.data.abuseConfidenceScore }}{% line_break %}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "Yes, that was me"
+                      },
+                      "style": "primary",
+                      "url": "{% prompt true %}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "No, that was not me"
+                      },
+                      "style": "danger",
+                      "url": "{% prompt false %}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "text": "A brief time ago we detected an unusual login via one of your *{{ .explode_logs.crowdsource_logs.content.attributes.crowdsource_service }}* accounts. Please click to indicate if this was you."
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential slack %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Search Slack Users by Username",
+      "disabled": false,
+      "guid": "e410862950e88e9ed76e453abbf25c3f",
+      "options": {
+        "url": "https://slack.com/api/users.lookupByEmail",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "email": "{{ .explode_logs.crowdsource_logs.content.attributes.crowdsource_user }}@yourdomain.com"
+        },
+        "headers": {
+          "Authorization": "Bearer {% credential slack %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Deduplicate Logs",
+      "disabled": false,
+      "guid": "1995ac4394d99b09b3ddc4022b2970ea",
+      "options": {
+        "mode": "deduplicate",
+        "lookback": "1000",
+        "path": "{{ .explode_logs.crowdsource_logs.id }}{{ .explode_logs.crowdsource_logs.content.attributes.crowdsource_user }}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Search Logs in Datadog",
+      "disabled": false,
+      "guid": "b95cc5773b044d83b80c3ee8b6a0e6b7",
+      "options": {
+        "url": "https://{% global_resource datadoghq %}/api/v1/logs-queries/list",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "query": "Accepted password for -webhook",
+          "time": {
+            "from": "now -10m",
+            "to": "now"
+          },
+          "sort": "desc",
+          "limit": "50"
+        },
+        "headers": {
+          "DD-API-KEY": "{% credential datadog-api-key %}",
+          "DD-APPLICATION-KEY": "{% credential datadog-application-key %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 11
+    },
+    {
+      "source": 2,
+      "receiver": 10
+    },
+    {
+      "source": 3,
+      "receiver": 9
+    },
+    {
+      "source": 4,
+      "receiver": 7
+    },
+    {
+      "source": 5,
+      "receiver": 3
+    },
+    {
+      "source": 8,
+      "receiver": 4
+    },
+    {
+      "source": 8,
+      "receiver": 6
+    },
+    {
+      "source": 9,
+      "receiver": 8
+    },
+    {
+      "source": 10,
+      "receiver": 5
+    },
+    {
+      "source": 11,
+      "receiver": 2
+    }
+  ],
+  "control_links": [
+
+  ],
+  "diagram_layout": "{\"a5c93df25ecde0242ad4ba46e002e3d8\":[-240,15],\"b95cc5773b044d83b80c3ee8b6a0e6b7\":[-240,75],\"5fd5d00326ed3070002b9ce1abbb637e\":[-240,330],\"e8d721ae3cd58719681ddb41dd4bb064\":[-240,150],\"1995ac4394d99b09b3ddc4022b2970ea\":[-240,210],\"25399905f32a703491f6f186f16cce6f\":[-240,270],\"e9ccc9b0e338966e2fdabad634a06a49\":[-315,600],\"5cf24426c092bec646a14e39487ffb9e\":[-90,600],\"49a2797fda3d50374c4670f859f311ed\":[-315,660],\"e410862950e88e9ed76e453abbf25c3f\":[-240,405],\"5ce1d78005b04278e72d529b50a2abdc\":[-945,330],\"b6ecbf0b4682183f45bee7d0b308704d\":[-240,480]}",
+  "send_to_story_enabled": null,
+  "entry_agent_guid": null,
+  "exit_agent_guid": null,
+  "send_to_stories": [
+    {
+      "schema_version": 1,
+      "name": "STS IR",
+      "description": null,
+      "guid": "2a3ac50e7c54cc73c110a02548fd5baa",
+      "exported_at": "2020-07-13T09:08:06Z",
+      "agents": [
+        {
+          "type": "Agents::WebhookAgent",
+          "name": "Webhook Agent",
+          "disabled": false,
+          "guid": "c2312bd5dccfea8a9eee91497ab64a58",
+          "options": {
+            "secret": "735e98d2986548056f288c89c22abbd4",
+            "verbs": "get,post"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Event Transform Agent",
+          "disabled": false,
+          "guid": "11174237381f0f55bd4d25674a9e0937",
+          "options": {
+            "mode": "message_only",
+            "message": "This is an automatically generated message from Tines"
+          },
+          "keep_events_for": 0
+        }
+      ],
+      "links": [
+        {
+          "source": 0,
+          "receiver": 1
+        }
+      ],
+      "control_links": [
+
+      ],
+      "diagram_layout": "{\"c2312bd5dccfea8a9eee91497ab64a58\":[-525,45],\"11174237381f0f55bd4d25674a9e0937\":[-510,135]}",
+      "send_to_story_enabled": true,
+      "entry_agent_guid": "c2312bd5dccfea8a9eee91497ab64a58",
+      "exit_agent_guid": "11174237381f0f55bd4d25674a9e0937"
+    }
+  ]
+}
