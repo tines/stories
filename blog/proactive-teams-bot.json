@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "name": "proactive notification bot",
+  "description": "To test this story copy the webhook URL from the \"receive events\" agent and add the parameter \"?user_email=email@yourdomain.com\". \r\n\r\nYou will need to change your Tenant ID, Bot ID and ensure the Service URL matches your Service URL for your Bot as explained in Part 1 of the blog.\r\n\r\nYou will also need to have an OAuth2.0 credential, \"msgraph\", created which has appropriate scopes to read information from groups and about users in your organization. \r\n\r\nLastly, you will need to have a Bot set up in Microsoft Teams, as described in part 1 of the \"Chatbots for Security and IT Teams - Part 1\" blog post with a client secret stored as teams_bot.\r\n\r\n",
+  "guid": "28bd3c45345e6ba18b07cbfee3d44de8",
+  "exported_at": "2019-08-06T17:24:41Z",
+  "agents": [
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "filter on useremail",
+      "disabled": false,
+      "guid": "1d91aa6b185833345a2eb21aeb7cd6ac",
+      "options": {
+        "mode": "message_only",
+        "userid": "{% for member in get_team_members.body %}{% if member.email == {{.receive_events.user_email}} %}{{member.id}}{% endif %}{% endfor %}",
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "get user profile",
+      "disabled": false,
+      "guid": "2d5042d6f1001bf714f25059ac41e541",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/users/{{.receive_events.user_email}}/",
+        "method": "get",
+        "content_type": "json",
+        "headers": {
+          "Authorization": "Bearer {% credential msgraph %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "get joined teams",
+      "disabled": false,
+      "guid": "5b60e55bd9258d09a0ea3ec791247ba3",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/users/{{.get_user_profile.body.id}}/joinedTeams",
+        "method": "get",
+        "content_type": "json",
+        "headers": {
+          "Authorization": "Bearer {% credential msgraph %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "get team members",
+      "disabled": false,
+      "guid": "68a800563b0b2b2b48af11f3b702c27d",
+      "options": {
+        "url": "https://smba.trafficmanager.net/emea/v3/conversations/{{.get_team_details.body.internalId}}/members",
+        "method": "get",
+        "content_type": "json",
+        "payload": {
+
+        },
+        "headers": {
+          "Authorization": "Bearer {{.get_bearer_token_from_ms.body.access_token}}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "create conversation with user",
+      "disabled": false,
+      "guid": "743a54684756326b280a7cafa1bcb4ae",
+      "options": {
+        "url": "https://smba.trafficmanager.net/emea/v3/conversations/",
+        "method": "post",
+        "content_type": "json",
+        "payload": {
+          "bot": {
+            "id": "28:9389ba52-77e9-40bb-b8a4-38ccac91dbf1",
+            "name": "Tines Bot"
+          },
+          "members": [
+            {
+              "id": "{{.filter_on_useremail.userid}}"
+            }
+          ],
+          "channelData": {
+            "tenant": {
+              "id": "33e1b5d3-361d-4859-be90-6f3cd100757f"
+            }
+          }
+        },
+        "headers": {
+          "Authorization": "Bearer {{.get_bearer_token_from_ms.body.access_token}}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "get team details",
+      "disabled": false,
+      "guid": "765cdf64d3705c2e953dcaecd3ac833e",
+      "options": {
+        "url": "https://graph.microsoft.com/v1.0/Teams/{{.get_joined_teams.body.value.first.id}}/",
+        "method": "get",
+        "content_type": "json",
+        "headers": {
+          "Authorization": "Bearer {% credential msgraph %}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "get bearer token from ms",
+      "disabled": false,
+      "guid": "7eaa716dedb92d30ba59a5e9a33ea423",
+      "options": {
+        "url": "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "grant_type": "client_credentials",
+          "client_id": "9389ba52-77e9-40bb-b8a4-38ccac91dbf1",
+          "client_secret": "{% credential teams_bot %}",
+          "scope": "https://api.botframework.com/.default"
+        },
+        "headers": {
+
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "receive events",
+      "disabled": false,
+      "guid": "b660a4f93aa43fb46619082fb73db238",
+      "options": {
+        "secret": "d049f64db712ac3765e1effb03426b67",
+        "verbs": "get,post",
+        "expected_update_period_in_days": 1
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "send thumbnail card to user",
+      "disabled": false,
+      "guid": "bc1d0b1ba18abfb437de12e856f1d149",
+      "options": {
+        "url": "https://smba.trafficmanager.net/emea/v3/conversations/{{.create_conversation_with_user.body.id}}/activities",
+        "method": "post",
+        "content_type": "json",
+        "payload": {
+          "type": "message",
+          "from": {
+            "id": "28:9389ba52-77e9-40bb-b8a4-38ccac91dbf1",
+            "name": "Tines Bot"
+          },
+          "recipient": {
+            "id": "{{.filter_on_useremail.userid}}"
+          },
+          "attachments": [
+            {
+              "contentType": "application/vnd.microsoft.card.thumbnail",
+              "content": {
+                "title": "Tines Security Alert",
+                "subtitle": "A new P2 alert has just been created in Jira",
+                "text": "A new P2 Alert has just been created in Jira with the title \"Suspicious Login Detected. The username for the alert is steve@tines.xyz, their title is \"Director of Engineering\", the login came from the IP 172.88.11.25 in Beijing, China.",
+                "images": [
+                  {
+                    "url": "https://pbs.twimg.com/profile_images/991318458712379393/iS-P5qg-_400x400.jpg",
+                    "alt": "Tines"
+                  }
+                ],
+                "buttons": [
+                  {
+                    "type": "openUrl",
+                    "title": "View Ticket",
+                    "value": "https://tinesio.atlassian.net/browse/POC-26"
+                  },
+                  {
+                    "type": "openUrl",
+                    "title": "Escalate to On Call",
+                    "value": "{% prompt escalate %}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "headers": {
+          "Authorization": "Bearer {{.get_bearer_token_from_ms.body.access_token}}"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 4
+    },
+    {
+      "source": 1,
+      "receiver": 2
+    },
+    {
+      "source": 2,
+      "receiver": 5
+    },
+    {
+      "source": 3,
+      "receiver": 0
+    },
+    {
+      "source": 4,
+      "receiver": 8
+    },
+    {
+      "source": 5,
+      "receiver": 6
+    },
+    {
+      "source": 6,
+      "receiver": 3
+    },
+    {
+      "source": 7,
+      "receiver": 1
+    }
+  ],
+  "control_links": [
+
+  ]
+}
