@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "name": "Avoiding VirusTotal rate limits",
+  "description": "A short story demonstrating how to avoid VirusTotal public API rate limits.",
+  "guid": "8255d9c2a3940f3a6de5fbdaa5af5a75",
+  "exported_at": "2018-10-12T11:01:40Z",
+  "agents": [
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Delay 20 seconds",
+      "disabled": false,
+      "guid": "1db469af00bd066c94a3e836a5f0e25c",
+      "options": {
+        "mode": "delay",
+        "seconds": 20,
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Response code 204",
+      "disabled": false,
+      "guid": "49eea75c35f19e6ff1977ca59d20e073",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "204",
+            "path": "{{.get_ip_report_from_virustotal.status}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Response code 200",
+      "disabled": false,
+      "guid": "cce6878d0a89e4cc93c868580edbe432",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "200",
+            "path": "{{.get_ip_report_from_virustotal.status}}"
+          }
+        ],
+        "expected_update_period_in_days": "2"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get IP report from virustotal",
+      "disabled": false,
+      "guid": "f36373681d74bf7932cf7cfb8f859c89",
+      "options": {
+        "url": "http://www.virustotal.com/vtapi/v2/ip-address/report",
+        "content_type": "form",
+        "method": "get",
+        "payload": {
+          "apikey": "7c31a8a9199b21373757631b37b2fa1e44109d6ddfa23a6bef9076a8c8aeb51b",
+          "ip": "165.227.135.98"
+        },
+        "expected_update_period_in_days": "1"
+      },
+      "schedule": "never",
+      "keep_events_for": 604800
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 3
+    },
+    {
+      "source": 1,
+      "receiver": 0
+    },
+    {
+      "source": 3,
+      "receiver": 2
+    },
+    {
+      "source": 3,
+      "receiver": 1
+    }
+  ],
+  "control_links": [
+
+  ]
+}
