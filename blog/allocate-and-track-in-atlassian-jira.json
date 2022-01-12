@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "name": "Allocate and Track in Atlassian Jira",
+  "description": "",
+  "guid": "a1ca91f5d78ef0dc2779a69309fad8b2",
+  "exported_at": "2020-06-15T08:44:37Z",
+  "agents": [
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Add Extra Information as Comment",
+      "disabled": false,
+      "guid": "3334fde2393024fb46c9e27850bb4899",
+      "options": {
+        "url": "https://{% global_resource jirahost %}/rest/api/2/issue/{{ .send_request_to_jira_service_desk.body.key }}/comment/",
+        "content_type": "json",
+        "method": "post",
+        "basic_auth": [
+          "{% global_resource jirausername %}",
+          "{% credential jira %}"
+        ],
+        "payload": {
+          "body": "*Note:* An additional email will be sent to team lead or manager for prioritisation. Query used was: '{{ .receive_ticket_request.query }}'"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if Created Successfully",
+      "disabled": false,
+      "guid": "8e0a1dedc1115286ca30a80738cec91b",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "201",
+            "path": "{{ .send_request_to_jira_service_desk.status }}"
+          }
+        ]
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "Receive Ticket Request",
+      "disabled": false,
+      "guid": "a790a5491f98bdf2ef51e4d249c569c2",
+      "options": {
+        "secret": "0c88fa5a46777c9a99a5d68da0b4a0f4",
+        "verbs": "get,post"
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Return Status",
+      "disabled": false,
+      "guid": "71f8931ddad54bf9c9ea5b620f0b7187",
+      "options": {
+        "mode": "message_only",
+        "status": "{{ .send_request_to_jira_service_desk.status }}",
+        "ticket_id": "{{ .send_request_to_jira_service_desk.body.id }}",
+        "ticket_key": "{{ .send_request_to_jira_service_desk.body.key }}",
+        "ticket_url": "{{ .send_request_to_jira_service_desk.body.self }}"
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Send Request to Jira Service Desk",
+      "disabled": false,
+      "guid": "9dc8d8296ad288a95764087664099d4d",
+      "options": {
+        "url": "https://{% global_resource jirahost %}/rest/api/2/issue",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "fields": {
+            "project": {
+              "key": "EN"
+            },
+            "issuetype": {
+              "name": "Submit a request or incident"
+            },
+            "priority": {
+              "name": "Highest"
+            },
+            "summary": "Security Issue : New {{ .receive_ticket_request.ostype | upcase }} Compromised / Infected Hosts",
+            "description": "Please see infected or compromised hosts below. {% line_break %}{% line_break %}h2. *Detection Information*{% line_break %}{% line_break %}\n\n{{ .receive_ticket_request.results_table_markdown }}{% line_break %}"
+          }
+        },
+        "basic_auth": [
+          "{% global_resource jirausername %}",
+          "{% credential jira %}"
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 3
+    },
+    {
+      "source": 1,
+      "receiver": 0
+    },
+    {
+      "source": 2,
+      "receiver": 4
+    },
+    {
+      "source": 4,
+      "receiver": 1
+    }
+  ],
+  "control_links": [
+
+  ],
+  "diagram_layout": "{\"a790a5491f98bdf2ef51e4d249c569c2\":[60,60],\"71f8931ddad54bf9c9ea5b620f0b7187\":[60,450],\"9dc8d8296ad288a95764087664099d4d\":[60,165],\"8e0a1dedc1115286ca30a80738cec91b\":[60,255],\"3334fde2393024fb46c9e27850bb4899\":[60,360]}",
+  "send_to_story_enabled": true,
+  "entry_agent_guid": "a790a5491f98bdf2ef51e4d249c569c2",
+  "exit_agent_guid": "71f8931ddad54bf9c9ea5b620f0b7187",
+  "send_to_stories": [
+
+  ]
+}

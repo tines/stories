@@ -1,0 +1,1010 @@
+{
+  "schema_version": 1,
+  "name": "SentinelOne Deep Visibility",
+  "description": "Sub-story for demo and blog showing how to use Sentinel One and Jira to secure productivity.",
+  "guid": "a384ddd0ee4c36be8f32f28a08bbaaab",
+  "exported_at": "2020-06-15T08:43:55Z",
+  "agents": [
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Delay Next Call",
+      "disabled": false,
+      "guid": "45a4872672ee9affbe9d40887c806200",
+      "options": {
+        "mode": "delay",
+        "seconds": "15"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "API Throttled",
+      "disabled": false,
+      "guid": "a3d0fbca10359557ab906d6b9631cc05",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "429",
+            "path": "{{ .create_dv_query_and_get_queryid.status}}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Delay Next Call",
+      "disabled": false,
+      "guid": "7e6838fe3382761d7b387981906157ed",
+      "options": {
+        "mode": "delay",
+        "seconds": "15"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Record Counter",
+      "disabled": false,
+      "guid": "34b27f6af4b6addc0ddd46da5e2acbde",
+      "options": {
+        "mode": "message_only",
+        "message": "{{.record_counter.message | plus: 1}}"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger If Timeout",
+      "disabled": false,
+      "guid": "dd0b0c22ead7f2c8500f95609175aab6",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "TIMED_OUT",
+            "path": "{{ .get_dv_query_status.body.data.responseState }}"
+          },
+          {
+            "type": "field<value",
+            "value": "10",
+            "path": "{{.record_counter.message}}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "API Ok",
+      "disabled": false,
+      "guid": "e87b7df10bcba3904ff6b00792f51565",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "value": "200",
+            "path": "{{ .create_dv_query_and_get_queryid.status}}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get DV Events",
+      "disabled": false,
+      "guid": "62e9b49823165a9b802c2624aa395566",
+      "options": {
+        "url": "https://{% global_resource sentinelone %}/web/api/v2.0/dv/events",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "ApiToken {% credential sentinelone-api-key %}"
+        },
+        "fail_on_status": "true",
+        "payload": {
+          "queryId": "{{.create_dv_query_and_get_queryid.body.data.queryId}}",
+          "limit": "100",
+          "sortOrder": "desc",
+          "cursor": "{{.get_dv_events.body.pagination.nextCursor}}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger if More Results",
+      "disabled": false,
+      "guid": "8f66442edb85d6d6181b4f49a54d3186",
+      "options": {
+        "rules": [
+          {
+            "type": "!regex",
+            "value": "^$",
+            "path": "{{ .get_dv_events.body.pagination.nextCursor }}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Implode Events",
+      "disabled": false,
+      "guid": "f9e27eff7314c14d8d4fdb4b34dc1a2b",
+      "options": {
+        "mode": "implode",
+        "guid_path": "{% story_run_guid %}",
+        "size_path": "{{ .initial_total_events.total_events }}"
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger When Complete",
+      "disabled": false,
+      "guid": "8a09715495265773f3000a0bac65b64b",
+      "options": {
+        "rules": [
+          {
+            "type": "field==value",
+            "path": "{{.get_dv_query_status.body.data.progressStatus}}",
+            "value": "100"
+          },
+          {
+            "type": "field==value",
+            "path": "{{.get_dv_query_status.body.data.responseState}}",
+            "value": "FINISHED"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Deduplicate Events by Agent Name and Run",
+      "disabled": false,
+      "guid": "a9347383dd8c72580a1b6c597eb542d2",
+      "options": {
+        "mode": "deduplicate",
+        "lookback": "1000",
+        "path": "{{.build_events.events.agentName}}{{.build_events.events.processName}}{% story_run_guid %}",
+        "emit_duplicate": "true"
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::SendToStoryAgent",
+      "name": "Manual Start Story",
+      "disabled": false,
+      "guid": "cab975638f2debcc60638dfed2f96858",
+      "options": {
+        "story": "{% story SentinelOne Deep Visibility %}",
+        "payload": {
+          "toDate": "2020-06-11T09:40:00.000Z",
+          "fromDate": "2020-06-09T08:00:00.000Z",
+          "query": "DNSRequest CONTAINS \"www.iuqerfsodp9ifjaposdfjhgosurijfaewrwergwea.com\"",
+          "ostype": "windows"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Test Sentinel One Console Connection",
+      "disabled": false,
+      "guid": "88c337dca474f0db835dbe21b0c0c292",
+      "options": {
+        "url": "https://{% global_resource sentinelone %}/",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "{% credential sentinelone-api-key %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get DV Events",
+      "disabled": false,
+      "guid": "d920ad3e2ae3047143d9716d38cee0bf",
+      "options": {
+        "url": "https://{% global_resource sentinelone %}/web/api/v2.0/dv/events",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "queryId": "{{.create_dv_query_and_get_queryid.body.data.queryId}}",
+          "limit": "100",
+          "sortOrder": "desc"
+        },
+        "headers": {
+          "Authorization": "ApiToken {% credential sentinelone-api-key %}"
+        },
+        "fail_on_status": "true"
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Initial Total Events",
+      "disabled": false,
+      "guid": "9414892b297126215c95e9352c03df19",
+      "options": {
+        "mode": "message_only",
+        "total_events": "{{ .get_dv_events.body.pagination.totalItems }}"
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Create DV Query and get QueryId",
+      "disabled": false,
+      "guid": "a9a02fc0ffdd73139a83c1778d3fc435",
+      "options": {
+        "url": "https://{% global_resource sentinelone %}/web/api/v2.0/dv/init-query",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "toDate": "{{.receive_query_from_parent_story.toDate}}",
+          "fromDate": "{{.receive_query_from_parent_story.fromDate}}",
+          "query": "{{.receive_query_from_parent_story.query}} AND AgentOS = \"{{ .receive_query_from_parent_story.ostype }}\"",
+          "queryType": [
+            "events"
+          ],
+          "tenant": true
+        },
+        "headers": {
+          "accept": "application/json",
+          "Authorization": "ApiToken {% credential sentinelone-api-key %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "Receive Query From Parent Story",
+      "disabled": false,
+      "guid": "ee69e6a88c889b2e9d211923b27e123e",
+      "options": {
+        "secret": "ff392c97e2d96a43cdc99106d175680b",
+        "verbs": "get,post"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Build Events",
+      "disabled": false,
+      "guid": "9e6dc172bec8b2c0cc363c28f7ddcfe9",
+      "options": {
+        "mode": "explode",
+        "path": "{{ .get_dv_events.body.data }}",
+        "to": "events"
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Return Results",
+      "disabled": false,
+      "guid": "dfbebeecf5698fcc574e54481defa0b1",
+      "options": {
+        "mode": "message_only",
+        "results_table_html": "{{ .build_a_simple_table.results_table_html }}",
+        "results_table_markdown": "{{ .build_a_simple_table.results_table_markdown }}",
+        "status": "{{ .add_status.status }}"
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Loop If Not Complete",
+      "disabled": false,
+      "guid": "e89632e87226247f487b9a82c01e10fd",
+      "options": {
+        "rules": [
+          {
+            "type": "field!=value",
+            "path": "{{.get_dv_query_status.body.data.progressStatus}}",
+            "value": "100"
+          },
+          {
+            "type": "field!=value",
+            "path": "{{.get_dv_query_status.body.data.responseState}}",
+            "value": "FINISHED"
+          },
+          {
+            "type": "field<value",
+            "value": "10",
+            "path": "{{.record_counter.message}}"
+          }
+        ]
+      },
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get DV Query Status",
+      "disabled": false,
+      "guid": "b78132e892e7bd0bb054a73503e440c0",
+      "options": {
+        "url": "https://{% global_resource sentinelone %}/web/api/v2.0/dv/query-status",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "queryId": "{{.create_dv_query_and_get_queryid.body.data.queryId}}"
+        },
+        "headers": {
+          "Authorization": "ApiToken {% credential sentinelone-api-key %}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 604800
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Add Status",
+      "disabled": false,
+      "guid": "09d4cae7b5bf6976e96f8bdaaff7baad",
+      "options": {
+        "mode": "message_only",
+        "status": "timeout"
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Add Status",
+      "disabled": false,
+      "guid": "9647b9e8e634d19cdac9642e017c1081",
+      "options": {
+        "mode": "message_only",
+        "status": "complete"
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Build a Simple Table",
+      "disabled": false,
+      "guid": "e6103c9e2273fe03b0dfb46a878f3488",
+      "options": {
+        "mode": "message_only",
+        "results_table_html": "<table id=\"searches\" style=\"text-align: left;\" width=\"50%\">\n  <tr>\n    <th style=\"padding-bottom: 10px;\"><b>Site Name </b></th>\n    <th style=\"padding-bottom: 10px;\"><b>Agent Name </b></th>\n    <th style=\"padding-bottom: 10px;\"><b>Operating System </b></th>\n    <th style=\"padding-bottom: 10px;\"><b>Process Name </b></th>\n    <th style=\"padding-bottom: 10px;\"><b>Agent IP Address </b></th>\n    <th style=\"padding-bottom: 10px;\"><b>Also Infected </b></th>\n\n  </tr>\n  {% for event in implode_events %}\n  {% if event.deduplicate_events_by_agent_name_and_run.unique_event %}\n  <tr>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.siteName }}</td>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.agentName }}</td>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.agentOs }}</td>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.processName }}</td>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.agentIp }}</td>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.agentInfected }}</td>\n  </tr>  \n   {% endif %}\n{% endfor %}\n</table>",
+        "results_table_markdown": "| Site Name | Agent Name | Operating System | Process Name | Agent IP Address | Infected |\n{% for event in implode_events %}{% if event.deduplicate_events_by_agent_name_and_run.unique_event %}| {{ event.build_events.events.siteName }} | {{ event.build_events.events.agentName }} | {{ event.build_events.events.agentOs }} | {{ event.build_events.events.processName }} | {{ event.build_events.events.agentIp }} | {{ event.build_events.events.agentInfected }} |\n{% endif %}{% endfor %}"
+      },
+      "keep_events_for": 0
+    }
+  ],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 20
+    },
+    {
+      "source": 1,
+      "receiver": 2
+    },
+    {
+      "source": 2,
+      "receiver": 15
+    },
+    {
+      "source": 3,
+      "receiver": 19
+    },
+    {
+      "source": 3,
+      "receiver": 4
+    },
+    {
+      "source": 4,
+      "receiver": 21
+    },
+    {
+      "source": 5,
+      "receiver": 20
+    },
+    {
+      "source": 6,
+      "receiver": 7
+    },
+    {
+      "source": 6,
+      "receiver": 17
+    },
+    {
+      "source": 7,
+      "receiver": 6
+    },
+    {
+      "source": 8,
+      "receiver": 23
+    },
+    {
+      "source": 9,
+      "receiver": 13
+    },
+    {
+      "source": 10,
+      "receiver": 8
+    },
+    {
+      "source": 12,
+      "receiver": 15
+    },
+    {
+      "source": 13,
+      "receiver": 14
+    },
+    {
+      "source": 14,
+      "receiver": 17
+    },
+    {
+      "source": 14,
+      "receiver": 7
+    },
+    {
+      "source": 15,
+      "receiver": 5
+    },
+    {
+      "source": 15,
+      "receiver": 1
+    },
+    {
+      "source": 16,
+      "receiver": 12
+    },
+    {
+      "source": 17,
+      "receiver": 10
+    },
+    {
+      "source": 19,
+      "receiver": 0
+    },
+    {
+      "source": 20,
+      "receiver": 9
+    },
+    {
+      "source": 20,
+      "receiver": 3
+    },
+    {
+      "source": 21,
+      "receiver": 18
+    },
+    {
+      "source": 22,
+      "receiver": 18
+    },
+    {
+      "source": 23,
+      "receiver": 22
+    }
+  ],
+  "control_links": [
+
+  ],
+  "diagram_layout": "{\"b78132e892e7bd0bb054a73503e440c0\":[300,-825],\"d920ad3e2ae3047143d9716d38cee0bf\":[450,-615],\"8a09715495265773f3000a0bac65b64b\":[450,-675],\"e89632e87226247f487b9a82c01e10fd\":[180,-675],\"45a4872672ee9affbe9d40887c806200\":[180,-615],\"88c337dca474f0db835dbe21b0c0c292\":[435,-1080],\"e87b7df10bcba3904ff6b00792f51565\":[300,-900],\"a3d0fbca10359557ab906d6b9631cc05\":[585,-900],\"7e6838fe3382761d7b387981906157ed\":[585,-840],\"a9a02fc0ffdd73139a83c1778d3fc435\":[435,-990],\"ee69e6a88c889b2e9d211923b27e123e\":[435,-1155],\"9e6dc172bec8b2c0cc363c28f7ddcfe9\":[450,-330],\"8f66442edb85d6d6181b4f49a54d3186\":[540,-465],\"62e9b49823165a9b802c2624aa395566\":[540,-405],\"34b27f6af4b6addc0ddd46da5e2acbde\":[90,-750],\"dd0b0c22ead7f2c8500f95609175aab6\":[90,-525],\"cab975638f2debcc60638dfed2f96858\":[-210,-750],\"a9347383dd8c72580a1b6c597eb542d2\":[450,-270],\"e6103c9e2273fe03b0dfb46a878f3488\":[450,-135],\"9414892b297126215c95e9352c03df19\":[450,-540],\"f9e27eff7314c14d8d4fdb4b34dc1a2b\":[450,-195],\"dfbebeecf5698fcc574e54481defa0b1\":[450,-15],\"09d4cae7b5bf6976e96f8bdaaff7baad\":[90,-465],\"9647b9e8e634d19cdac9642e017c1081\":[450,-75]}",
+  "send_to_story_enabled": true,
+  "entry_agent_guid": "ee69e6a88c889b2e9d211923b27e123e",
+  "exit_agent_guid": "dfbebeecf5698fcc574e54481defa0b1",
+  "send_to_stories": [
+    {
+      "schema_version": 1,
+      "name": "SentinelOne Deep Visibility",
+      "description": "Sub-story for demo and blog showing how to use Sentinel One and Jira to secure productivity.",
+      "guid": "a384ddd0ee4c36be8f32f28a08bbaaab",
+      "exported_at": "2020-06-15T08:43:55Z",
+      "agents": [
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Delay Next Call",
+          "disabled": false,
+          "guid": "45a4872672ee9affbe9d40887c806200",
+          "options": {
+            "mode": "delay",
+            "seconds": "15"
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::TriggerAgent",
+          "name": "API Throttled",
+          "disabled": false,
+          "guid": "a3d0fbca10359557ab906d6b9631cc05",
+          "options": {
+            "rules": [
+              {
+                "type": "field==value",
+                "value": "429",
+                "path": "{{ .create_dv_query_and_get_queryid.status}}"
+              }
+            ]
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Delay Next Call",
+          "disabled": false,
+          "guid": "7e6838fe3382761d7b387981906157ed",
+          "options": {
+            "mode": "delay",
+            "seconds": "15"
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Record Counter",
+          "disabled": false,
+          "guid": "34b27f6af4b6addc0ddd46da5e2acbde",
+          "options": {
+            "mode": "message_only",
+            "message": "{{.record_counter.message | plus: 1}}"
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::TriggerAgent",
+          "name": "Trigger If Timeout",
+          "disabled": false,
+          "guid": "dd0b0c22ead7f2c8500f95609175aab6",
+          "options": {
+            "rules": [
+              {
+                "type": "field==value",
+                "value": "TIMED_OUT",
+                "path": "{{ .get_dv_query_status.body.data.responseState }}"
+              },
+              {
+                "type": "field<value",
+                "value": "10",
+                "path": "{{.record_counter.message}}"
+              }
+            ]
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::TriggerAgent",
+          "name": "API Ok",
+          "disabled": false,
+          "guid": "e87b7df10bcba3904ff6b00792f51565",
+          "options": {
+            "rules": [
+              {
+                "type": "field==value",
+                "value": "200",
+                "path": "{{ .create_dv_query_and_get_queryid.status}}"
+              }
+            ]
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Get DV Events",
+          "disabled": false,
+          "guid": "62e9b49823165a9b802c2624aa395566",
+          "options": {
+            "url": "https://{% global_resource sentinelone %}/web/api/v2.0/dv/events",
+            "content_type": "json",
+            "method": "get",
+            "headers": {
+              "Authorization": "ApiToken {% credential sentinelone-api-key %}"
+            },
+            "fail_on_status": "true",
+            "payload": {
+              "queryId": "{{.create_dv_query_and_get_queryid.body.data.queryId}}",
+              "limit": "100",
+              "sortOrder": "desc",
+              "cursor": "{{.get_dv_events.body.pagination.nextCursor}}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::TriggerAgent",
+          "name": "Trigger if More Results",
+          "disabled": false,
+          "guid": "8f66442edb85d6d6181b4f49a54d3186",
+          "options": {
+            "rules": [
+              {
+                "type": "!regex",
+                "value": "^$",
+                "path": "{{ .get_dv_events.body.pagination.nextCursor }}"
+              }
+            ]
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Implode Events",
+          "disabled": false,
+          "guid": "f9e27eff7314c14d8d4fdb4b34dc1a2b",
+          "options": {
+            "mode": "implode",
+            "guid_path": "{% story_run_guid %}",
+            "size_path": "{{ .initial_total_events.total_events }}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::TriggerAgent",
+          "name": "Trigger When Complete",
+          "disabled": false,
+          "guid": "8a09715495265773f3000a0bac65b64b",
+          "options": {
+            "rules": [
+              {
+                "type": "field==value",
+                "path": "{{.get_dv_query_status.body.data.progressStatus}}",
+                "value": "100"
+              },
+              {
+                "type": "field==value",
+                "path": "{{.get_dv_query_status.body.data.responseState}}",
+                "value": "FINISHED"
+              }
+            ]
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Deduplicate Events by Agent Name and Run",
+          "disabled": false,
+          "guid": "a9347383dd8c72580a1b6c597eb542d2",
+          "options": {
+            "mode": "deduplicate",
+            "lookback": "1000",
+            "path": "{{.build_events.events.agentName}}{{.build_events.events.processName}}{% story_run_guid %}",
+            "emit_duplicate": "true"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::SendToStoryAgent",
+          "name": "Manual Start Story",
+          "disabled": false,
+          "guid": "cab975638f2debcc60638dfed2f96858",
+          "options": {
+            "story": "{% story SentinelOne Deep Visibility %}",
+            "payload": {
+              "toDate": "2020-06-11T09:40:00.000Z",
+              "fromDate": "2020-06-09T08:00:00.000Z",
+              "query": "DNSRequest CONTAINS \"www.iuqerfsodp9ifjaposdfjhgosurijfaewrwergwea.com\"",
+              "ostype": "windows"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Test Sentinel One Console Connection",
+          "disabled": false,
+          "guid": "88c337dca474f0db835dbe21b0c0c292",
+          "options": {
+            "url": "https://{% global_resource sentinelone %}/",
+            "content_type": "json",
+            "method": "get",
+            "headers": {
+              "Authorization": "{% credential sentinelone-api-key %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Get DV Events",
+          "disabled": false,
+          "guid": "d920ad3e2ae3047143d9716d38cee0bf",
+          "options": {
+            "url": "https://{% global_resource sentinelone %}/web/api/v2.0/dv/events",
+            "content_type": "json",
+            "method": "get",
+            "payload": {
+              "queryId": "{{.create_dv_query_and_get_queryid.body.data.queryId}}",
+              "limit": "100",
+              "sortOrder": "desc"
+            },
+            "headers": {
+              "Authorization": "ApiToken {% credential sentinelone-api-key %}"
+            },
+            "fail_on_status": "true"
+          },
+          "schedule": null,
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Initial Total Events",
+          "disabled": false,
+          "guid": "9414892b297126215c95e9352c03df19",
+          "options": {
+            "mode": "message_only",
+            "total_events": "{{ .get_dv_events.body.pagination.totalItems }}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Create DV Query and get QueryId",
+          "disabled": false,
+          "guid": "a9a02fc0ffdd73139a83c1778d3fc435",
+          "options": {
+            "url": "https://{% global_resource sentinelone %}/web/api/v2.0/dv/init-query",
+            "content_type": "json",
+            "method": "post",
+            "payload": {
+              "toDate": "{{.receive_query_from_parent_story.toDate}}",
+              "fromDate": "{{.receive_query_from_parent_story.fromDate}}",
+              "query": "{{.receive_query_from_parent_story.query}} AND AgentOS = \"{{ .receive_query_from_parent_story.ostype }}\"",
+              "queryType": [
+                "events"
+              ],
+              "tenant": true
+            },
+            "headers": {
+              "accept": "application/json",
+              "Authorization": "ApiToken {% credential sentinelone-api-key %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::WebhookAgent",
+          "name": "Receive Query From Parent Story",
+          "disabled": false,
+          "guid": "ee69e6a88c889b2e9d211923b27e123e",
+          "options": {
+            "secret": "ff392c97e2d96a43cdc99106d175680b",
+            "verbs": "get,post"
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Build Events",
+          "disabled": false,
+          "guid": "9e6dc172bec8b2c0cc363c28f7ddcfe9",
+          "options": {
+            "mode": "explode",
+            "path": "{{ .get_dv_events.body.data }}",
+            "to": "events"
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Return Results",
+          "disabled": false,
+          "guid": "dfbebeecf5698fcc574e54481defa0b1",
+          "options": {
+            "mode": "message_only",
+            "results_table_html": "{{ .build_a_simple_table.results_table_html }}",
+            "results_table_markdown": "{{ .build_a_simple_table.results_table_markdown }}",
+            "status": "{{ .add_status.status }}"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::TriggerAgent",
+          "name": "Loop If Not Complete",
+          "disabled": false,
+          "guid": "e89632e87226247f487b9a82c01e10fd",
+          "options": {
+            "rules": [
+              {
+                "type": "field!=value",
+                "path": "{{.get_dv_query_status.body.data.progressStatus}}",
+                "value": "100"
+              },
+              {
+                "type": "field!=value",
+                "path": "{{.get_dv_query_status.body.data.responseState}}",
+                "value": "FINISHED"
+              },
+              {
+                "type": "field<value",
+                "value": "10",
+                "path": "{{.record_counter.message}}"
+              }
+            ]
+          },
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Get DV Query Status",
+          "disabled": false,
+          "guid": "b78132e892e7bd0bb054a73503e440c0",
+          "options": {
+            "url": "https://{% global_resource sentinelone %}/web/api/v2.0/dv/query-status",
+            "content_type": "json",
+            "method": "get",
+            "payload": {
+              "queryId": "{{.create_dv_query_and_get_queryid.body.data.queryId}}"
+            },
+            "headers": {
+              "Authorization": "ApiToken {% credential sentinelone-api-key %}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 604800
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Add Status",
+          "disabled": false,
+          "guid": "09d4cae7b5bf6976e96f8bdaaff7baad",
+          "options": {
+            "mode": "message_only",
+            "status": "timeout"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Add Status",
+          "disabled": false,
+          "guid": "9647b9e8e634d19cdac9642e017c1081",
+          "options": {
+            "mode": "message_only",
+            "status": "complete"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Build a Simple Table",
+          "disabled": false,
+          "guid": "e6103c9e2273fe03b0dfb46a878f3488",
+          "options": {
+            "mode": "message_only",
+            "results_table_html": "<table id=\"searches\" style=\"text-align: left;\" width=\"50%\">\n  <tr>\n    <th style=\"padding-bottom: 10px;\"><b>Site Name </b></th>\n    <th style=\"padding-bottom: 10px;\"><b>Agent Name </b></th>\n    <th style=\"padding-bottom: 10px;\"><b>Operating System </b></th>\n    <th style=\"padding-bottom: 10px;\"><b>Process Name </b></th>\n    <th style=\"padding-bottom: 10px;\"><b>Agent IP Address </b></th>\n    <th style=\"padding-bottom: 10px;\"><b>Also Infected </b></th>\n\n  </tr>\n  {% for event in implode_events %}\n  {% if event.deduplicate_events_by_agent_name_and_run.unique_event %}\n  <tr>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.siteName }}</td>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.agentName }}</td>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.agentOs }}</td>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.processName }}</td>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.agentIp }}</td>\n    <td style=\"border-top: 1px solid #e7eaec;\">{{ event.build_events.events.agentInfected }}</td>\n  </tr>  \n   {% endif %}\n{% endfor %}\n</table>",
+            "results_table_markdown": "| Site Name | Agent Name | Operating System | Process Name | Agent IP Address | Infected |\n{% for event in implode_events %}{% if event.deduplicate_events_by_agent_name_and_run.unique_event %}| {{ event.build_events.events.siteName }} | {{ event.build_events.events.agentName }} | {{ event.build_events.events.agentOs }} | {{ event.build_events.events.processName }} | {{ event.build_events.events.agentIp }} | {{ event.build_events.events.agentInfected }} |\n{% endif %}{% endfor %}"
+          },
+          "keep_events_for": 0
+        }
+      ],
+      "links": [
+        {
+          "source": 0,
+          "receiver": 20
+        },
+        {
+          "source": 1,
+          "receiver": 2
+        },
+        {
+          "source": 2,
+          "receiver": 15
+        },
+        {
+          "source": 3,
+          "receiver": 19
+        },
+        {
+          "source": 3,
+          "receiver": 4
+        },
+        {
+          "source": 4,
+          "receiver": 21
+        },
+        {
+          "source": 5,
+          "receiver": 20
+        },
+        {
+          "source": 6,
+          "receiver": 7
+        },
+        {
+          "source": 6,
+          "receiver": 17
+        },
+        {
+          "source": 7,
+          "receiver": 6
+        },
+        {
+          "source": 8,
+          "receiver": 23
+        },
+        {
+          "source": 9,
+          "receiver": 13
+        },
+        {
+          "source": 10,
+          "receiver": 8
+        },
+        {
+          "source": 12,
+          "receiver": 15
+        },
+        {
+          "source": 13,
+          "receiver": 14
+        },
+        {
+          "source": 14,
+          "receiver": 17
+        },
+        {
+          "source": 14,
+          "receiver": 7
+        },
+        {
+          "source": 15,
+          "receiver": 5
+        },
+        {
+          "source": 15,
+          "receiver": 1
+        },
+        {
+          "source": 16,
+          "receiver": 12
+        },
+        {
+          "source": 17,
+          "receiver": 10
+        },
+        {
+          "source": 19,
+          "receiver": 0
+        },
+        {
+          "source": 20,
+          "receiver": 9
+        },
+        {
+          "source": 20,
+          "receiver": 3
+        },
+        {
+          "source": 21,
+          "receiver": 18
+        },
+        {
+          "source": 22,
+          "receiver": 18
+        },
+        {
+          "source": 23,
+          "receiver": 22
+        }
+      ],
+      "control_links": [
+
+      ],
+      "diagram_layout": "{\"b78132e892e7bd0bb054a73503e440c0\":[300,-825],\"d920ad3e2ae3047143d9716d38cee0bf\":[450,-615],\"8a09715495265773f3000a0bac65b64b\":[450,-675],\"e89632e87226247f487b9a82c01e10fd\":[180,-675],\"45a4872672ee9affbe9d40887c806200\":[180,-615],\"88c337dca474f0db835dbe21b0c0c292\":[435,-1080],\"e87b7df10bcba3904ff6b00792f51565\":[300,-900],\"a3d0fbca10359557ab906d6b9631cc05\":[585,-900],\"7e6838fe3382761d7b387981906157ed\":[585,-840],\"a9a02fc0ffdd73139a83c1778d3fc435\":[435,-990],\"ee69e6a88c889b2e9d211923b27e123e\":[435,-1155],\"9e6dc172bec8b2c0cc363c28f7ddcfe9\":[450,-330],\"8f66442edb85d6d6181b4f49a54d3186\":[540,-465],\"62e9b49823165a9b802c2624aa395566\":[540,-405],\"34b27f6af4b6addc0ddd46da5e2acbde\":[90,-750],\"dd0b0c22ead7f2c8500f95609175aab6\":[90,-525],\"cab975638f2debcc60638dfed2f96858\":[-210,-750],\"a9347383dd8c72580a1b6c597eb542d2\":[450,-270],\"e6103c9e2273fe03b0dfb46a878f3488\":[450,-135],\"9414892b297126215c95e9352c03df19\":[450,-540],\"f9e27eff7314c14d8d4fdb4b34dc1a2b\":[450,-195],\"dfbebeecf5698fcc574e54481defa0b1\":[450,-15],\"09d4cae7b5bf6976e96f8bdaaff7baad\":[90,-465],\"9647b9e8e634d19cdac9642e017c1081\":[450,-75]}",
+      "send_to_story_enabled": true,
+      "entry_agent_guid": "ee69e6a88c889b2e9d211923b27e123e",
+      "exit_agent_guid": "dfbebeecf5698fcc574e54481defa0b1"
+    }
+  ]
+}
