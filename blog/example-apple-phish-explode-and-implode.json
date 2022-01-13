@@ -1,0 +1,207 @@
+{
+  "schema_version": 4,
+  "name": "[Example] Apple Phish Explode and Implode",
+  "description": "Used For Loops and If Statements",
+  "guid": "20b9f66009eb33d38b957313c792a172",
+  "exported_at": "2022-01-13T17:11:59Z",
+  "agents": [
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Check if Any All or None Malicious",
+      "disabled": false,
+      "guid": "ba4d473c28ba29631743c7ffc85fbe5b",
+      "options": {
+        "mode": "message_only",
+        "payload": {
+          "all_results": "{% capture all_results %}{{.implode_events | map: 'retrieve_urlscan_result.body.verdicts.overall.malicious' }}{% endcapture %}{{all_results}}",
+          "any_malicious": "{% if all_results contains 'true' %}True{% else %}False{% endif %}",
+          "all_malicious": "{% if all_results contains 'false' %}False{% else %}True{% endif %}",
+          "none_malicious": "{% if all_results contains 'true' %}False{% else %}True{% endif %}",
+          "Total_Events": "{{.explode_scans.size}}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Retrieve URLScan Result",
+      "disabled": false,
+      "guid": "6846ed87b9a6b2e6b55a9a8e8b98e76a",
+      "options": {
+        "url": "{{.explode_scans.individual_scan.result}}",
+        "method": "get",
+        "headers": {
+          "API-Key": "{% credential urlscan %}"
+        },
+        "fail_on_status": "true",
+        "manual_time": "30",
+        "log_error_on_status": []
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Delay Event",
+      "disabled": false,
+      "guid": "5ae9a98043c412302599a0a97fed1582",
+      "options": {
+        "mode": "delay",
+        "seconds": "{{.explode_scans.index | times: 5 }}"
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Implode Events",
+      "disabled": false,
+      "guid": "066dc3cb01d0da1d6d7086b71bebba3b",
+      "options": {
+        "mode": "implode",
+        "guid_path": "{{.explode_scans.guid}}",
+        "size_path": "{{.explode_scans.size}}"
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "explode scans",
+      "disabled": false,
+      "guid": "e734d8c632f9219c1d088ff501be436c",
+      "options": {
+        "mode": "explode",
+        "path": "{{.get_apple_scans_by_hash.body.results}}",
+        "to": "individual_scan"
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get Apple Scans by Hash",
+      "disabled": false,
+      "guid": "663803d3e7242393b0e1dd30196d75c2",
+      "options": {
+        "url": "https://urlscan.io/api/v1/search/",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "q": "(hash:bca2ec8caf9eaaa75ed49a2f0de20067590b055d7457ae1f0c67acd394055fdc) date:[now-7d TO now]"
+        },
+        "headers": {
+          "API-Key": "{% credential urlscan %}"
+        },
+        "log_error_on_status": []
+      },
+      "schedule": [
+        {
+          "cron": "0 */12 * * *",
+          "timezone": "Etc/UTC"
+        }
+      ],
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Output all Domains",
+      "disabled": false,
+      "guid": "aa7a646275731e9ecd9f505c998180bf",
+      "options": {
+        "mode": "message_only",
+        "payload": {
+          "domains": "{{.implode_events | map: 'retrieve_urlscan_result.body.page.domain' | uniq | as_object }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EmailAgent",
+      "name": "Email Agent",
+      "disabled": false,
+      "guid": "83a16e80c313c4ecf75fabd79a0aa28b",
+      "options": {
+        "recipients": [
+          "thomas@tines.io"
+        ],
+        "subject": "Result of Recent Scans",
+        "body": "Results of recent scans:\n\nDomain, Malicious?<br>\n{% for scan in implode_events %}{{scan.retrieve_urlscan_result.body.page.domain | replace: '.', '[.]'}}, {{scan.retrieve_urlscan_result.body.verdicts.overall.malicious}}<br>\n{% endfor %}"
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    }
+  ],
+  "diagram_notes": [
+    {
+      "content": "# Understanding Implode\n\nThis story searches URLScan for a Hash in the last 7 days. This is likely to return multiple results in an array and we want to get details for each of these results.  \n\nTo do this, the `explode scans` Action will take one event containing the array of results, and break it up into multiple events - one for each item in the array.\n\nThese individual items can then be analyzed independently. In this case, detailed results are retrieved from URLScan.\n\nAfter analysis completes, all of these Events can be brought back together using the `Implode Events` Action. This Action will merge events together based on a common value, and specified number of events to wait for. `Explode` provides a `guid` and `size` that can be used for this.\n",
+      "position": [
+        360.0,
+        -975.0
+      ],
+      "guid": "3a2cdd9d3ef08c04930492a6fec014f0"
+    },
+    {
+      "content": "# Looping\n\nLooping is very important when it comes to presenting data. In this case, multiple URLs have been analyzed. And, thanks to `Implode` they are all in an Array in one Event.\n\nA Loop can be used to summarise these results, and send an email containing that information.\n\nWhen the Action is run this will go through each item in the collection one by one, and build up the email content dynamically. In this case, it will go through each URL, 'defang' it, and include whether the URL was identified as malicious.",
+      "position": [
+        -450.0,
+        -360.0
+      ],
+      "guid": "664ee5a20703b7f99580b110c3f941b1"
+    },
+    {
+      "content": "# Extracting Values from Arrays\n\nAs an extra step, we can extract a list of all analysed Domain. Rather than looping through `implode events`, it's much simpler to use `map`. \n\nWhen provided with a path that exists in one or more values in an Array, `map` will extract the value at that location from each record.\n\n`uniq` will deduplicate this list so that each URL is only presented once, and `as_object` makes sure that Tines returns this new list as an Array.",
+      "position": [
+        540.0,
+        -225.0
+      ],
+      "guid": "b1a767163821a56ec676120b18e8ea26"
+    }
+  ],
+  "links": [
+    {
+      "source": 1,
+      "receiver": 3
+    },
+    {
+      "source": 2,
+      "receiver": 1
+    },
+    {
+      "source": 3,
+      "receiver": 0
+    },
+    {
+      "source": 3,
+      "receiver": 7
+    },
+    {
+      "source": 3,
+      "receiver": 6
+    },
+    {
+      "source": 4,
+      "receiver": 2
+    },
+    {
+      "source": 5,
+      "receiver": 4
+    }
+  ],
+  "diagram_layout": "{\"ba4d473c28ba29631743c7ffc85fbe5b\":[225.0,-330.0],\"6846ed87b9a6b2e6b55a9a8e8b98e76a\":[105.0,-525.0],\"5ae9a98043c412302599a0a97fed1582\":[105.0,-615.0],\"066dc3cb01d0da1d6d7086b71bebba3b\":[105.0,-435.0],\"e734d8c632f9219c1d088ff501be436c\":[105.0,-690.0],\"663803d3e7242393b0e1dd30196d75c2\":[105.0,-795.0],\"aa7a646275731e9ecd9f505c998180bf\":[495.0,-330.0],\"83a16e80c313c4ecf75fabd79a0aa28b\":[-105.0,-330.0]}",
+  "send_to_story_enabled": false,
+  "entry_agent_guid": null,
+  "exit_agent_guids": [],
+  "exit_agent_guid": null,
+  "send_to_stories": [],
+  "form": {
+    "name": "[Example] Apple Phish Explode and Implode Form",
+    "description": "",
+    "fields": [],
+    "visibility": "tenant",
+    "agent_guid": null,
+    "success_message": "Thank you for your submission"
+  }
+}
