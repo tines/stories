@@ -1,0 +1,328 @@
+{
+  "schema_version": 4,
+  "name": "GMail Mailbox Overview",
+  "description": null,
+  "guid": "4e582e5ea653d42688d2735206e3575c",
+  "exported_at": "2022-01-31T14:43:52Z",
+  "agents": [
+    {
+      "type": "Agents::IMAPAgent",
+      "name": "Read Mail",
+      "disabled": false,
+      "guid": "4ce67f8df1b49ea1c78c029135ae1233",
+      "options": {
+        "host": "imap.example.com",
+        "username": "your.account",
+        "password": "your.password",
+        "ssl": true,
+        "folders": [
+          "INBOX"
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Read Mail from Mailbox",
+      "disabled": false,
+      "guid": "9007f37b6159dddcaf4509f045b4dbd6",
+      "options": {
+        "url": "https://www.googleapis.com/gmail/v1/users/{{.user}}/messages/",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {{ .CREDENTIAL.google }}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Read Mail from Group",
+      "disabled": false,
+      "guid": "be53c1273debe72b861123b0338f54b1",
+      "options": {
+        "url": "https://www.googleapis.com/gmail/v1/users/{{.user}}/messages/",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {{ .CREDENTIAL.google }}"
+        },
+        "payload": {
+          "q": "to:group@domain.com"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Get a Google Bearer token.",
+      "disabled": false,
+      "guid": "2678fcd09b78ca262111b4c2b62e9552",
+      "options": {
+        "url": "https://www.googleapis.com/oauth2/v4/token",
+        "content_type": "form",
+        "method": "post",
+        "payload": {
+          "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+          "assertion": "{{.CREDENTIAL.demo_alerts_center}}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Read Mail from Mailbox",
+      "disabled": false,
+      "guid": "33354fcca71710d4ede0dd62fef532ac",
+      "options": {
+        "url": "https://www.googleapis.com/gmail/v1/users/{{user}}/messages/",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {{get_a_google_bearer_token.body.access_token}}"
+        },
+        "payload": {}
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::SendToStoryAgent",
+      "name": "Get DwD Bearer Token",
+      "disabled": false,
+      "guid": "31bd31e73669ac186b401912546a8752",
+      "options": {
+        "story": "{{.STORY.gsuite_dwd}}",
+        "payload": {
+          "userid": "{{user}}",
+          "service_account_email": "{{service_account_email}}",
+          "scope": "https://www.googleapis.com/auth/gmail.readonly"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Read Mail from Mailbox",
+      "disabled": false,
+      "guid": "4f82aabd3592d697c377775243b059bb",
+      "options": {
+        "url": "https://www.googleapis.com/gmail/v1/users/{{explode_alerts.alert.data.messages.first.recipient}}/messages/{{get_gsuite_message_id.body.messages.first.id}}",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {{get_dwd_bearer_token.access_token}}"
+        },
+        "payload": {
+          "format": "raw"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    }
+  ],
+  "diagram_notes": [
+    {
+      "content": "# Read mail from one mailbox - IMAP\n\nGMail does support reading mails via IMAP. This does require some admin configuration to permit access through this method.\n\nFor security reasons, many organisations will not allow IMAP to be enabled.",
+      "position": [
+        -75.0,
+        75.0
+      ],
+      "guid": "b226272365fcd49972963d9524d356b1"
+    },
+    {
+      "content": "# Read mail from one mailbox - OAuth\n\nThis Action connects directly to the GSuite API, and uses an OAuth Bearer token to authenticate.\n\nThis requires an app be created in the Google Cloud Console, and a OAuth Credential be created in Tines",
+      "position": [
+        360.0,
+        15.0
+      ],
+      "guid": "8f55bcb0eaac3d0f599af54ff9859453"
+    },
+    {
+      "content": "# Read mail from Group - OAuth\nThis Action connects directly to the GSuite API, and uses an OAuth Bearer token to authenticate.\n\nThis requires an app be created in the Google Cloud Console, and a OAuth Credential be created in Tines\n\nThere is no current ability to read mail directly from a Group. Instead, this action queries the mailbox of a user that has access to the Group, and runs a query for all Group Emails\n",
+      "position": [
+        810.0,
+        -75.0
+      ],
+      "guid": "dfa8c64a0572e62e7bbb928b22d0063d"
+    },
+    {
+      "content": "# Read mail from one mailbox - JWT\nThis Action connects directly to the GSuite API, and uses a JWT Token and service account to authenticate.\n\nThis requires an app be created in the Google Cloud Console with a service accounts, and a JWT Credential be created in Tines.\n\nThis method may suite users that are looking to do other admin tasks that will require a Service Account, such as reading from the Google Alerts Center.\n\nThe JWT Credential is used to create a Bearer Token in the first action. The resulting token is then used to retrieve mail.",
+      "position": [
+        1215.0,
+        -135.0
+      ],
+      "guid": "db53d475e540e0f48a4e832dfa87bc01"
+    },
+    {
+      "content": "# Read mail from any mailbox - JWT with DWD\nThis Action connects directly to the GSuite API, and uses a service account to authenticate.\n\nThis requires an app be created in the Google Cloud Console, and have Domain Wide Delegation approved for any necessary scopes in the Google Admin Console.\n\nThis will allow the service account to delegate as any user in the organisation, and connect to their mailbox.\n\nTines will automatically generate the JWT Request in the Get DwD Bearer Token Action, authenticate to the GSuite API, and return the access token needed to connect to GMail. A Text Credential will need to be created containing just the Private Key generated when creating the Service Account Credentials.",
+      "position": [
+        1695.0,
+        -210.0
+      ],
+      "guid": "a68f6d20160301e32f3591de5cf271d3"
+    }
+  ],
+  "links": [
+    {
+      "source": 3,
+      "receiver": 4
+    },
+    {
+      "source": 5,
+      "receiver": 6
+    }
+  ],
+  "diagram_layout": "{\"4ce67f8df1b49ea1c78c029135ae1233\":[-75.0,270.0],\"9007f37b6159dddcaf4509f045b4dbd6\":[360.0,270.0],\"be53c1273debe72b861123b0338f54b1\":[811.0,270.0],\"2678fcd09b78ca262111b4c2b62e9552\":[1215.0,270.0],\"33354fcca71710d4ede0dd62fef532ac\":[1215.0,360.0],\"31bd31e73669ac186b401912546a8752\":[1695.0,270.0],\"4f82aabd3592d697c377775243b059bb\":[1695.0,360.0]}",
+  "send_to_story_enabled": false,
+  "entry_agent_guid": null,
+  "exit_agent_guids": [],
+  "exit_agent_guid": null,
+  "send_to_stories": [
+    {
+      "schema_version": 4,
+      "name": "GSuite DWD",
+      "description": null,
+      "guid": "6bfc078a57da9fb403d78431918ef849",
+      "exported_at": "2022-01-31T14:43:52Z",
+      "agents": [
+        {
+          "type": "Agents::HTTPRequestAgent",
+          "name": "Request access token",
+          "disabled": false,
+          "guid": "2ac24cb9264a11e745b9e5fd4240c3b3",
+          "options": {
+            "url": "https://www.googleapis.com/oauth2/v4/token",
+            "content_type": "form",
+            "method": "post",
+            "payload": {
+              "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+              "assertion": "{{.sign_jwt.bearer}}"
+            },
+            "log_error_on_status": []
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Create claimset",
+          "disabled": false,
+          "guid": "9099da0f8666d1272fc1128043210b32",
+          "options": {
+            "mode": "message_only",
+            "payload": {
+              "jwt_claim": "{%assign iss = .receive_request.body.service_account_email%}{%assign sub = .receive_request.body.userid%}{%assign scope = .receive_request.body.scope%}{%assign aud = 'https://www.googleapis.com/oauth2/v4/token'%}{%capture exp%}{{'now' | date: '%s' | plus: 3600}}{%endcapture%}{%capture iat%}{{'now' | date: '%s'}}{%endcapture%}{%capture claim%}{\"iss\":\"{{iss}}\",\"sub\":\"{{sub}}\",\"aud\":\"{{aud}}\",\"scope\":\"{{scope}}\",\"exp\":{{exp}},\"iat\":{{iat}}}{%endcapture%}{{claim}}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Sign JWT",
+          "disabled": false,
+          "guid": "64e23ad6612450a9a4455a64a579d9e7",
+          "options": {
+            "mode": "message_only",
+            "payload": {
+              "bearer": "{% capture secret %}{{.CREDENTIAL.gsuite_tk}}{% endcapture %}{{.create_claimset.jwt_claim | jwt_sign: secret }}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::WebhookAgent",
+          "name": "Receive Request",
+          "disabled": false,
+          "guid": "b81cf002c1ead6a617b0ac5010c30898",
+          "options": {
+            "secret": "55298024b95764aa4551e65dfe3d8798",
+            "verbs": "get,post",
+            "path": "b81cf002c1ead6a617b0ac5010c30898"
+          },
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::EventTransformationAgent",
+          "name": "Return Access Token",
+          "disabled": false,
+          "guid": "0c3953bdefe76f728b287350e373085d",
+          "options": {
+            "mode": "message_only",
+            "payload": {
+              "access_token": "{{.request_access_token.body.access_token }}"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        },
+        {
+          "type": "Agents::SendToStoryAgent",
+          "name": "Get DwD Bearer Token",
+          "disabled": false,
+          "guid": "ba3ab374e3b08b062cdb57294a0fc04c",
+          "options": {
+            "story": "{{.STORY.gsuite_dwd}}",
+            "payload": {
+              "userid": "{{user}}",
+              "service_account_email": "{{service_account_email}}",
+              "scope": "https://www.googleapis.com/auth/gmail.readonly"
+            }
+          },
+          "schedule": null,
+          "keep_events_for": 0
+        }
+      ],
+      "diagram_notes": [],
+      "links": [
+        {
+          "source": 0,
+          "receiver": 4
+        },
+        {
+          "source": 1,
+          "receiver": 2
+        },
+        {
+          "source": 2,
+          "receiver": 0
+        },
+        {
+          "source": 3,
+          "receiver": 1
+        }
+      ],
+      "diagram_layout": "{\"2ac24cb9264a11e745b9e5fd4240c3b3\":[820.0,797.0],\"9099da0f8666d1272fc1128043210b32\":[820.0,632.0],\"64e23ad6612450a9a4455a64a579d9e7\":[820.0,707.0],\"b81cf002c1ead6a617b0ac5010c30898\":[825.0,540.0],\"0c3953bdefe76f728b287350e373085d\":[830.0,899.0],\"ba3ab374e3b08b062cdb57294a0fc04c\":[570.0,540.0]}",
+      "send_to_story_enabled": true,
+      "entry_agent_guid": "b81cf002c1ead6a617b0ac5010c30898",
+      "exit_agent_guids": [
+        "0c3953bdefe76f728b287350e373085d"
+      ],
+      "exit_agent_guid": "0c3953bdefe76f728b287350e373085d",
+      "form": {
+        "name": "GSuite DWD Form",
+        "description": "",
+        "fields": [],
+        "visibility": "tenant",
+        "agent_guid": null,
+        "success_message": "Thank you for your submission"
+      }
+    }
+  ],
+  "form": {
+    "name": "GMail Mailbox Overview Form",
+    "description": "",
+    "fields": [],
+    "visibility": "tenant",
+    "agent_guid": null,
+    "success_message": "Thank you for your submission"
+  }
+}
