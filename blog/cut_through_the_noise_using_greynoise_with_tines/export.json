@@ -237,7 +237,7 @@
       "options": {
         "secret": "4aa9a007cbd6a864c6edb457f51f8fde",
         "verbs": "get,post",
-        "response": "{{ .RESOURCE.greynoise_blocklist | join: '\\n' }}"
+        "response": "{{ .RESOURCE.greynoise_blocklist | join: '\n' }}"
       },
       "keep_events_for": 0
     },
