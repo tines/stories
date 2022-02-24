@@ -273,7 +273,7 @@
       "guid": "e4ff7e81a8e122b4c593a4f9e473c591",
       "options": {
         "mode": "explode",
-        "path": "{{ .ip_list.body.data }}",
+        "path": "{{ .search_greynoise_by_asn_using_gnql.body.data }}",
         "to": "individual_record"
       },
       "schedule": null,
