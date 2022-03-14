@@ -1,0 +1,348 @@
+{
+  "schema_version": 4,
+  "name": "Microsoft Teams Chatbot",
+  "description": null,
+  "guid": "b311c3b7741a8c6490ba59b344cd9ef9",
+  "exported_at": "2022-03-10T21:32:56Z",
+  "agents": [
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Fetch Team Roster",
+      "disabled": false,
+      "guid": "48654f179a1d1775e1ef7dbf778bc14d",
+      "options": {
+        "url": "https://{{RESOURCE.microsoft_serviceurl}}/v3/conversations/{{RESOURCE.teams_tines_team_id}}/members",
+        "content_type": "json",
+        "method": "get",
+        "headers": {
+          "Authorization": "Bearer {{CREDENTIAL.teamschatbot}}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Get member information",
+      "disabled": false,
+      "guid": "880298bf45bba39fcd7e9cdd0c18083b",
+      "options": {
+        "mode": "message_only",
+        "loop": false,
+        "payload": {
+          "id": "{{fetch_team_roster.body | where: \"name\", \"Aaron Sandow\" | get: \"id\"}}",
+          "tenantID": "{{fetch_team_roster.body | where: \"name\", \"Aaron Sandow\" | get: \"tenantId\"}}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Start Conversation with User",
+      "disabled": false,
+      "guid": "f68f4ffe98bfd9ed00629704a284443d",
+      "options": {
+        "url": "https://{{RESOURCE.microsoft_serviceurl}}/v3/conversations/",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "bot": {
+            "id": "{{RESOURCE.microsoft_teams_bot_id}}",
+            "name": "Tines Bot"
+          },
+          "members": [
+            {
+              "id": "{{get_member_information.id}}"
+            }
+          ],
+          "channelData": {
+            "tenant": {
+              "id": "{{get_member_information.tenantID}}"
+            }
+          }
+        },
+        "headers": {
+          "Authorization": "Bearer {{CREDENTIAL.teamschatbot}}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Send card to user",
+      "disabled": false,
+      "guid": "7c2eb492c2802d128d3942e5b9ef99e6",
+      "options": {
+        "url": "https://{{RESOURCE.microsoft_serviceurl}}/v3/conversations/{{start_conversation_with_user.body.id}}/activities",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "type": "message",
+          "from": {
+            "id": "{{RESOURCE.microsoft_teams_bot_id}}",
+            "name": "Tines Bot"
+          },
+          "recipient": {
+            "id": "{{get_member_information.id}}"
+          },
+          "attachments": [
+            {
+              "contentType": "application/vnd.microsoft.card.thumbnail",
+              "content": {
+                "title": "Security Alert",
+                "subtitle": "A new alert has just been created in Jira",
+                "text": "A new alert has just been created in Jira with the JIRA ID: {{create_issue_in_jira.body.id}}.{%line_break%}\nMicrosoft Sentinel severity is {{demo_incident_from_ms_sentinel.properties.severity}}.{%line_break%}\nMicrosoft Sentinel identified tactics are {{demo_incident_from_ms_sentinel.properties.additionalData.tactics}}.{%line_break%}\nMicrosoft Sentinel incident Number: {{demo_incident_from_ms_sentinel.properties.incidentNumber}}.{%line_break%}",
+                "images": [
+                  {
+                    "url": "https://logo.clearbit.com/tines.com",
+                    "alt": "Tines"
+                  }
+                ],
+                "buttons": [
+                  {
+                    "type": "openUrl",
+                    "title": "View Sentinel Incident",
+                    "value": "{{demo_incident_from_ms_sentinel.properties.incidentUrl}}"
+                  },
+                  {
+                    "type": "openUrl",
+                    "title": "View Jira Incident",
+                    "value": "https://tinesio.atlassian.net/browse/{{create_issue_in_jira.body.key}}"
+                  },
+                  {
+                    "type": "openUrl",
+                    "title": "Escalate to On Call",
+                    "value": "{%prompt escalate%}"
+                  },
+                  {
+                    "type": "openUrl",
+                    "title": "Mark False Positive",
+                    "value": "{%prompt falsepositive%}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "headers": {
+          "Authorization": "Bearer {{CREDENTIAL.teamschatbot}}"
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Demo Incident from MS Sentinel",
+      "disabled": false,
+      "guid": "887f3014f3f7ffc4b26edfbeba3aee4b",
+      "options": {
+        "mode": "message_only",
+        "loop": false,
+        "payload": {
+          "id": "/subscriptions/d0cfe6b2-9ac0-4464-9919-dccaee2e48c0/resourceGroups/myRg/providers/Microsoft.OperationalInsights/workspaces/myWorkspace/providers/Microsoft.SecurityInsights/incidents/73e01a99-5cd7-4139-a149-9f2736ff2ab5",
+          "name": "73e01a99-5cd7-4139-a149-9f2736ff2ab5",
+          "type": "Microsoft.SecurityInsights/incidents",
+          "etag": "\"0300bf09-0000-0000-0000-5c37296e0000\"",
+          "properties": {
+            "lastModifiedTimeUtc": "2019-01-01T13:15:30Z",
+            "createdTimeUtc": "2019-01-01T13:15:30Z",
+            "lastActivityTimeUtc": "2019-01-01T13:05:30Z",
+            "firstActivityTimeUtc": "2019-01-01T13:00:30Z",
+            "description": "This is a demo incident",
+            "title": "My incident",
+            "owner": {
+              "objectId": "2046feea-040d-4a46-9e2b-91c2941bfa70",
+              "email": "john.doe@contoso.com",
+              "userPrincipalName": "john@contoso.com",
+              "assignedTo": "john doe"
+            },
+            "severity": "High",
+            "classification": "FalsePositive",
+            "classificationComment": "Not a malicious activity",
+            "classificationReason": "InaccurateData",
+            "status": "Closed",
+            "incidentUrl": "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/Incident/subscriptions/d0cfe6b2-9ac0-4464-9919-dccaee2e48c0/resourceGroups/myRg/providers/Microsoft.OperationalInsights/workspaces/myWorkspace/providers/Microsoft.SecurityInsights/incidents/73e01a99-5cd7-4139-a149-9f2736ff2ab5",
+            "incidentNumber": 3177,
+            "labels": [],
+            "relatedAnalyticRuleIds": [
+              "/subscriptions/d0cfe6b2-9ac0-4464-9919-dccaee2e48c0/resourceGroups/myRg/providers/Microsoft.OperationalInsights/workspaces/myWorkspace/providers/Microsoft.SecurityInsights/alertRules/fab3d2d4-747f-46a7-8ef0-9c0be8112bf7"
+            ],
+            "additionalData": {
+              "alertsCount": 0,
+              "bookmarksCount": 0,
+              "commentsCount": 3,
+              "alertProductNames": [],
+              "tactics": [
+                "InitialAccess",
+                "Persistence"
+              ]
+            }
+          }
+        }
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Check if escalate",
+      "disabled": false,
+      "guid": "e8fc7adcdcfec51d428a34de60272f39",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "escalate",
+            "path": "{{send_card_to_user.prompt.status}}"
+          }
+        ]
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Check if falsepositive",
+      "disabled": false,
+      "guid": "cbc53590f491184f15fc4cd80fc27fb6",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "falsepositive",
+            "path": "{{send_card_to_user.prompt.status}}"
+          }
+        ]
+      },
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::EmailAgent",
+      "name": "Email Action",
+      "disabled": false,
+      "guid": "e956135c9a1005bb17d97e547a6505d5",
+      "options": {
+        "recipients": [
+          "{{demo_incident_from_ms_sentinel.properties.owner.email}}"
+        ],
+        "subject": "Example email from Tines",
+        "body": "A new alert has just been created in Jira with the JIRA ID: {{create_issue_in_jira.body.id}}.\nMicrosoft Sentinel severity is {{demo_incident_from_ms_sentinel.properties.severity}}. <br>\nMicrosoft Sentinel identified tactics are {{demo_incident_from_ms_sentinel.properties.additionalData.tactics}}.<br>\nMicrosoft Sentinel incident Number: {{demo_incident_from_ms_sentinel.properties.incidentNumber}}.<br>"
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Close Jira Ticket",
+      "disabled": false,
+      "guid": "c90ecafacc096f1e275cb438a998de0c",
+      "options": {
+        "url": "https://{{.RESOURCE.jira_domain}}/rest/api/3/issue/{{create_issue_in_jira.body.id}}/transitions",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "transition": {
+            "id": "31"
+          }
+        },
+        "basic_auth": [
+          "{{ .RESOURCE.jira_username }}",
+          "{{.CREDENTIAL.jira}}"
+        ],
+        "log_error_on_status": []
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Create Issue in Jira",
+      "disabled": false,
+      "guid": "d9445444c78908b3540d902f4a3229d1",
+      "options": {
+        "url": "https://{{.RESOURCE.jira_domain}}/rest/api/2/issue",
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "fields": {
+            "project": {
+              "key": "DEMO"
+            },
+            "issuetype": {
+              "name": "Task"
+            },
+            "priority": {
+              "name": "Highest"
+            },
+            "description": "h2. Alert Overview:\n\n||*Severity*|{{.demo_incident_from_ms_sentinel.properties.severity}} |\n||*Description*|{{.demo_incident_from_ms_sentinel.properties.description}} |\n||*Tactics*|{{.demo_incident_from_ms_sentinel.properties.additionalData.tactics}} |\n||*Classification*|{{.demo_incident_from_ms_sentinel.properties.classification}} |\n||*Created Time*|{{.demo_incident_from_ms_sentinel.properties.createdTimeUtc}} |\n||*Owner*|{{.demo_incident_from_ms_sentinel.properties.owner}} |\n\nSentinel Alert ID:\n{{.demo_incident_from_ms_sentinel.id}}\n",
+            "summary": "New Sentinel Alert"
+          }
+        },
+        "basic_auth": [
+          "{{.RESOURCE.jira_username}}",
+          "{{.CREDENTIAL.jira}}"
+        ],
+        "retry_on_status": [
+          "429"
+        ]
+      },
+      "schedule": null,
+      "keep_events_for": 0
+    }
+  ],
+  "diagram_notes": [],
+  "links": [
+    {
+      "source": 0,
+      "receiver": 1
+    },
+    {
+      "source": 1,
+      "receiver": 2
+    },
+    {
+      "source": 2,
+      "receiver": 3
+    },
+    {
+      "source": 3,
+      "receiver": 6
+    },
+    {
+      "source": 3,
+      "receiver": 5
+    },
+    {
+      "source": 4,
+      "receiver": 9
+    },
+    {
+      "source": 5,
+      "receiver": 7
+    },
+    {
+      "source": 6,
+      "receiver": 8
+    },
+    {
+      "source": 9,
+      "receiver": 0
+    }
+  ],
+  "diagram_layout": "{\"48654f179a1d1775e1ef7dbf778bc14d\":[345.0,180.0],\"880298bf45bba39fcd7e9cdd0c18083b\":[345.0,255.0],\"f68f4ffe98bfd9ed00629704a284443d\":[345.0,330.0],\"7c2eb492c2802d128d3942e5b9ef99e6\":[345.0,420.0],\"887f3014f3f7ffc4b26edfbeba3aee4b\":[345.0,-15.0],\"e8fc7adcdcfec51d428a34de60272f39\":[345.0,495.0],\"cbc53590f491184f15fc4cd80fc27fb6\":[600.0,495.0],\"e956135c9a1005bb17d97e547a6505d5\":[345.0,570.0],\"c90ecafacc096f1e275cb438a998de0c\":[600.0,570.0],\"d9445444c78908b3540d902f4a3229d1\":[345.0,90.0]}",
+  "send_to_story_enabled": false,
+  "entry_agent_guid": null,
+  "exit_agent_guids": [],
+  "exit_agent_guid": null,
+  "send_to_stories": [],
+  "form": {
+    "name": "Microsoft Teams Chatbot Form",
+    "description": "",
+    "fields": [],
+    "visibility": "tenant",
+    "agent_guid": null,
+    "success_message": "Thank you for your submission"
+  }
+}
